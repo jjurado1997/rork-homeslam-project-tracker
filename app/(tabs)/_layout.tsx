@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Home, BarChart3, Settings } from "lucide-react-native";
+import { Home, BarChart3, Settings, DollarSign } from "lucide-react-native";
 import React from "react";
 import { theme } from "@/constants/theme";
 
@@ -30,6 +30,14 @@ export default function TabLayout() {
           title: "Projects",
           headerTitle: "Homeslam",
           tabBarIcon: ({ color }) => <Home size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="revenue"
+        options={{
+          title: "Revenue",
+          headerTitle: "Homeslam",
+          tabBarIcon: ({ color }) => <DollarSign size={24} color={color} />,
         }}
       />
       <Tabs.Screen
