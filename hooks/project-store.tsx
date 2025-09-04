@@ -282,7 +282,14 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
 
     switch (selectedPeriod) {
       case 'daily':
-        filtered = filtered.filter(p => p.projectStartDate >= startOfDay);
+        // Show projects that start TODAY only (not future dates)
+        filtered = filtered.filter(p => {
+          const projectDate = new Date(p.projectStartDate);
+          projectDate.setHours(0, 0, 0, 0);
+          const todayStart = new Date(startOfDay);
+          todayStart.setHours(0, 0, 0, 0);
+          return projectDate.getTime() === todayStart.getTime();
+        });
         break;
       case 'weekly':
         filtered = filtered.filter(p => p.projectStartDate >= startOfWeek);
