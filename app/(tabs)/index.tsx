@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Plus } from 'lucide-react-native';
+import { Plus, Settings } from 'lucide-react-native';
 import { theme } from '@/constants/theme';
 import { useProjects } from '@/hooks/project-store';
 import { ProjectCard } from '@/components/ProjectCard';
@@ -115,6 +115,14 @@ export default function ProjectsScreen() {
         activeOpacity={0.8}
       >
         <Plus size={28} color={theme.colors.primary} />
+      </TouchableOpacity>
+      
+      <TouchableOpacity 
+        style={styles.debugFab} 
+        onPress={() => router.push('/debug')}
+        activeOpacity={0.8}
+      >
+        <Settings size={24} color={theme.colors.primary} />
       </TouchableOpacity>
     </View>
   );
@@ -250,5 +258,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 8,
+  },
+  debugFab: {
+    position: 'absolute',
+    right: theme.spacing.lg,
+    bottom: 88, // Above the main FAB
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: theme.colors.warning,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 6,
   },
 });
