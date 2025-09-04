@@ -6,51 +6,17 @@ import { Project, Expense, ProjectStats, ChangeOrder } from '@/types/project';
 
 const STORAGE_KEY = 'homeslam_projects';
 
-// Store USER_ID persistently so it doesn't change between sessions
-const getUserId = async () => {
-  let userId = await AsyncStorage.getItem('homeslam_user_id');
-  if (!userId) {
-    userId = 'homeslam_user_' + Math.random().toString(36).substr(2, 9);
-    await AsyncStorage.setItem('homeslam_user_id', userId);
-  }
-  return userId;
-};
-
-// Simple backend API using a free service
+// Backend API placeholder - currently using local storage only
 const backendAPI = {
   async saveProjects(projects: Project[]) {
-    try {
-      const userId = await getUserId();
-      
-      // Use a simple key-value storage service
-      const response = await fetch('https://httpbin.org/post', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          projects,
-          timestamp: new Date().toISOString()
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to save to backend');
-      }
-      
-      console.log('Backend save successful');
-      return { success: true };
-    } catch (error) {
-      console.log('Backend save failed, using local storage only:', error);
-      throw error;
-    }
+    // Backend integration disabled for now - using local storage only
+    console.log('Backend save skipped - using local storage only');
+    return { success: true };
   },
 
   async loadProjects(): Promise<Project[]> {
-    // For now, we'll rely on local storage as the primary source
-    // This ensures data persistence even if backend is unavailable
-    throw new Error('Backend load not implemented - using local storage');
+    // Backend integration disabled for now - using local storage only
+    return [];
   }
 };
 
