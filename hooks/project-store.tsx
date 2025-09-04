@@ -6,17 +6,60 @@ import { Project, Expense, ProjectStats, ChangeOrder } from '@/types/project';
 
 const STORAGE_KEY = 'homeslam_projects';
 
-// Backend API placeholder - currently using local storage only
+// Backend API using cloud database
+const BACKEND_URL = 'https://api.jsonbin.io/v3/b/67d8f2e5e41b4d34e4642c8a';
+const API_KEY = '$2a$10$8vF2qJ3kL9mN5pR7sT1uVeX4yZ6wQ8eR2tY5uI9oP3aS7dF1gH6jK';
+
 const backendAPI = {
   async saveProjects(projects: Project[]) {
-    // Backend integration disabled for now - using local storage only
-    console.log('Backend save skipped - using local storage only');
-    return { success: true };
+    try {
+      console.log('Saving projects to backend:', projects.length);
+      const response = await fetch(BACKEND_URL, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': API_KEY,
+        },
+        body: JSON.stringify({ projects }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Backend save failed: ${response.status}`);
+      }
+      
+      console.log('Successfully saved to backend');
+      return { success: true };
+    } catch (error) {
+      console.error('Backend save error:', error);
+      throw error;
+    }
   },
 
   async loadProjects(): Promise<Project[]> {
-    // Backend integration disabled for now - using local storage only
-    return [];
+    try {
+      console.log('Loading projects from backend...');
+      const response = await fetch(BACKEND_URL + '/latest', {
+        headers: {
+          'X-Master-Key': API_KEY,
+        },
+      });
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log('No data found in backend, starting fresh');
+          return [];
+        }
+        throw new Error(`Backend load failed: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const projects = data.record?.projects || [];
+      console.log('Loaded from backend:', projects.length, 'projects');
+      return projects;
+    } catch (error) {
+      console.error('Backend load error:', error);
+      return [];
+    }
   }
 };
 
@@ -31,14 +74,31 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     queryFn: async () => {
       let projects: Project[] = [];
       
-      // Load from local storage (primary source)
-      console.log('Loading projects from local storage...');
-      const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        projects = JSON.parse(stored) as Project[];
-        console.log('Loaded from local storage:', projects.length, 'projects');
-      } else {
-        console.log('No projects found in local storage');
+      try {
+        // Try to load from backend first
+        projects = await backendAPI.loadProjects();
+        
+        // If backend is empty, try local storage as fallback
+        if (projects.length === 0) {
+          console.log('Backend empty, checking local storage...');
+          const stored = await AsyncStorage.getItem(STORAGE_KEY);
+          if (stored) {
+            const localProjects = JSON.parse(stored) as Project[];
+            console.log('Found local projects, migrating to backend:', localProjects.length);
+            
+            // Migrate local data to backend
+            if (localProjects.length > 0) {
+              await backendAPI.saveProjects(localProjects);
+              projects = localProjects;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load from backend, using local storage:', error);
+        const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          projects = JSON.parse(stored) as Project[];
+        }
       }
       
       // Normalize dates
@@ -64,20 +124,30 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     mutationFn: async (projects: Project[]) => {
       console.log('Saving projects:', projects.length);
       
-      // Always save to local storage first (immediate)
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
-      console.log('Saved to local storage');
-      
-      // Try to save to backend (async, non-blocking)
-      backendAPI.saveProjects(projects).catch(() => {
-        // Silently fail - local storage is the primary source
-        console.log('Backend save failed, but local save succeeded');
-      });
+      try {
+        // Save to backend first (primary storage)
+        await backendAPI.saveProjects(projects);
+        console.log('Saved to backend successfully');
+        
+        // Also save to local storage as backup
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+        console.log('Saved to local storage as backup');
+      } catch (error) {
+        console.error('Backend save failed, saving to local storage only:', error);
+        // If backend fails, at least save locally
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+        // Re-throw to show user there was an issue
+        throw new Error('Failed to save to cloud. Data saved locally only.');
+      }
       
       return projects;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+    onError: (error) => {
+      console.error('Save mutation error:', error);
+      // You could show a toast notification here
     }
   });
 
