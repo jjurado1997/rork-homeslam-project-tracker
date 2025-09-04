@@ -32,18 +32,29 @@ export default function RevenueScreen() {
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
 
   const filteredProjects = useMemo(() => {
-    const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const startOfWeek = new Date(startOfDay);
-    startOfWeek.setDate(startOfDay.getDate() - startOfDay.getDay());
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    try {
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const startOfWeek = new Date(startOfDay);
+      startOfWeek.setDate(startOfDay.getDate() - startOfDay.getDay());
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    let filtered = allProjects.filter(p => {
-      // Ensure project has required properties
-      return p && p.projectStartDate && p.totalRevenue !== undefined;
-    });
+      let filtered = (allProjects || []).filter(p => {
+        // Ensure project has required properties and valid dates
+        try {
+          return p && 
+                 p.projectStartDate && 
+                 p.projectStartDate instanceof Date &&
+                 !isNaN(p.projectStartDate.getTime()) &&
+                 typeof p.totalRevenue === 'number' &&
+                 !isNaN(p.totalRevenue);
+        } catch (error) {
+          console.warn('Invalid project in revenue filter:', p?.name, error);
+          return false;
+        }
+      });
 
-    switch (selectedPeriod) {
+      switch (selectedPeriod) {
       case 'daily':
         filtered = filtered.filter(p => {
           try {
@@ -78,16 +89,20 @@ export default function RevenueScreen() {
           }
         });
         break;
-    }
-
-    return filtered.sort((a, b) => {
-      try {
-        return new Date(b.projectStartDate).getTime() - new Date(a.projectStartDate).getTime();
-      } catch (error) {
-        console.error('Error sorting projects:', error);
-        return 0;
       }
-    });
+
+      return filtered.sort((a, b) => {
+        try {
+          return new Date(b.projectStartDate).getTime() - new Date(a.projectStartDate).getTime();
+        } catch (error) {
+          console.error('Error sorting projects:', error);
+          return 0;
+        }
+      });
+    } catch (error) {
+      console.error('Error in filteredProjects:', error);
+      return [];
+    }
   }, [allProjects, selectedPeriod]);
 
   const revenueStats = useMemo((): RevenueStats => {

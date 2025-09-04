@@ -70,23 +70,30 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
               return null;
             }
             
-            // Ensure all required properties exist with safe defaults
-            const createdAt = p.createdAt ? new Date(p.createdAt) : new Date();
-            const projectStartDate = p.projectStartDate 
-              ? new Date(p.projectStartDate) 
-              : (p as any).startDate 
-                ? new Date((p as any).startDate)
-                : createdAt;
+            // Safe date parsing function
+            const safeParseDate = (dateValue: any, fallback: Date = new Date()): Date => {
+              if (!dateValue) return fallback;
+              
+              try {
+                const parsed = new Date(dateValue);
+                if (isNaN(parsed.getTime())) {
+                  console.warn('Invalid date value:', dateValue);
+                  return fallback;
+                }
+                return parsed;
+              } catch (error) {
+                console.warn('Error parsing date:', dateValue, error);
+                return fallback;
+              }
+            };
             
-            // Validate dates are valid
-            if (isNaN(createdAt.getTime())) {
-              console.warn(`⚠️ Invalid createdAt date for project ${index}:`, p.name);
-              return null;
-            }
-            if (isNaN(projectStartDate.getTime())) {
-              console.warn(`⚠️ Invalid projectStartDate for project ${index}:`, p.name);
-              return null;
-            }
+            // Ensure all required properties exist with safe defaults
+            const createdAt = safeParseDate(p.createdAt);
+            const projectStartDate = safeParseDate(
+              p.projectStartDate || (p as any).startDate,
+              createdAt
+            );
+            const completedAt = p.completedAt ? safeParseDate(p.completedAt) : undefined;
             
             return {
               id: p.id || `project_${Date.now()}_${index}`,
@@ -96,17 +103,17 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
               totalRevenue: typeof p.totalRevenue === 'number' && !isNaN(p.totalRevenue) ? p.totalRevenue : 0,
               createdAt,
               projectStartDate,
-              completedAt: p.completedAt ? new Date(p.completedAt) : undefined,
+              completedAt,
               isCompleted: Boolean(p.isCompleted),
               notes: p.notes || '',
               changeOrders: Array.isArray(p.changeOrders) ? p.changeOrders.map((co, coIndex) => {
                 try {
                   return {
-                    id: co.id || `co_${Date.now()}_${coIndex}`,
-                    description: co.description || '',
-                    amount: typeof co.amount === 'number' && !isNaN(co.amount) ? co.amount : 0,
-                    date: co.date ? new Date(co.date) : new Date(),
-                    approved: Boolean(co.approved)
+                    id: co?.id || `co_${Date.now()}_${coIndex}`,
+                    description: co?.description || '',
+                    amount: typeof co?.amount === 'number' && !isNaN(co.amount) ? co.amount : 0,
+                    date: safeParseDate(co?.date),
+                    approved: Boolean(co?.approved)
                   };
                 } catch (coError) {
                   console.warn(`⚠️ Invalid change order at index ${coIndex}:`, co);
@@ -122,12 +129,12 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
               expenses: Array.isArray(p.expenses) ? p.expenses.map((e, eIndex) => {
                 try {
                   return {
-                    id: e.id || `expense_${Date.now()}_${eIndex}`,
-                    category: e.category || 'other',
-                    subcategory: e.subcategory || 'Miscellaneous',
-                    amount: typeof e.amount === 'number' && !isNaN(e.amount) ? e.amount : 0,
-                    description: e.description || '',
-                    date: e.date ? new Date(e.date) : new Date()
+                    id: e?.id || `expense_${Date.now()}_${eIndex}`,
+                    category: (e?.category as any) || 'other',
+                    subcategory: e?.subcategory || 'Miscellaneous',
+                    amount: typeof e?.amount === 'number' && !isNaN(e.amount) ? e.amount : 0,
+                    description: e?.description || '',
+                    date: safeParseDate(e?.date)
                   };
                 } catch (eError) {
                   console.warn(`⚠️ Invalid expense at index ${eIndex}:`, e);

@@ -24,9 +24,13 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
   }
 
   componentDidCatch(error: Error, errorInfo: any) {
-    console.error('Error caught by boundary:', error, errorInfo);
+    console.error('💥 Error caught by boundary:', error, errorInfo);
+    console.error('📍 Component stack:', errorInfo.componentStack);
+    
     // Try to clear potentially corrupted data
-    AsyncStorage.removeItem('homeslam_projects').catch(console.error);
+    AsyncStorage.removeItem('homeslam_projects')
+      .then(() => console.log('🧹 Cleared storage after crash'))
+      .catch(clearError => console.error('❌ Failed to clear storage:', clearError));
   }
 
   render() {
