@@ -50,14 +50,11 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
             } else {
               console.warn('⚠️ Stored data is not an array, clearing...');
               await AsyncStorage.removeItem(STORAGE_KEY);
-              setIsRecovering(true);
               return [];
             }
           } catch (parseError) {
             console.error('❌ Error parsing stored projects:', parseError);
-            setInitError(`Parse error: ${parseError}`);
             await AsyncStorage.removeItem(STORAGE_KEY);
-            setIsRecovering(true);
             return [];
           }
         } else {
@@ -155,8 +152,6 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
         return normalizedProjects;
       } catch (error) {
         console.error('💥 Critical error loading projects:', error);
-        setInitError(`Critical error: ${error}`);
-        setIsRecovering(true);
         // Try to clear corrupted data automatically
         try {
           await AsyncStorage.removeItem(STORAGE_KEY);
@@ -167,12 +162,7 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
         return [];
       }
     },
-    retry: (failureCount, error) => {
-      // Don't retry if we're in recovery mode
-      if (isRecovering) return false;
-      return failureCount < 2;
-    },
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
+    retry: false, // Disable retries to prevent infinite loops
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000
   });

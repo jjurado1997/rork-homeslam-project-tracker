@@ -41,7 +41,7 @@ export default function ProjectsScreen() {
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.secondary} />
         <Text style={styles.loadingText}>
-          {isRecovering ? 'Recovering from data issues...' : 'Loading projects...'}
+          {isRecovering ? 'Recovering from data issues...' : 'Loading Homeslam...'}
         </Text>
         {isRecovering && (
           <Text style={styles.recoveryText}>
