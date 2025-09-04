@@ -103,6 +103,27 @@ function RootLayoutNav() {
           presentation: 'modal',
         }} 
       />
+      <Stack.Screen 
+        name="edit-expense" 
+        options={{ 
+          title: "Edit Expense",
+          presentation: 'modal',
+        }} 
+      />
+      <Stack.Screen 
+        name="edit-project" 
+        options={{ 
+          title: "Edit Project",
+          presentation: 'modal',
+        }} 
+      />
+      <Stack.Screen 
+        name="add-change-order" 
+        options={{ 
+          title: "Add Change Order",
+          presentation: 'modal',
+        }} 
+      />
     </Stack>
   );
 }

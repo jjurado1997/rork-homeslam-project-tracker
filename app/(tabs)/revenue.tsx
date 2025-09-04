@@ -38,27 +38,56 @@ export default function RevenueScreen() {
     startOfWeek.setDate(startOfDay.getDate() - startOfDay.getDay());
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    let filtered = allProjects;
+    let filtered = allProjects.filter(p => {
+      // Ensure project has required properties
+      return p && p.projectStartDate && p.totalRevenue !== undefined;
+    });
 
     switch (selectedPeriod) {
       case 'daily':
-        filtered = allProjects.filter(p => {
-          const projectDate = new Date(p.projectStartDate);
-          projectDate.setHours(0, 0, 0, 0);
-          const todayStart = new Date(startOfDay);
-          todayStart.setHours(0, 0, 0, 0);
-          return projectDate.getTime() === todayStart.getTime();
+        filtered = filtered.filter(p => {
+          try {
+            const projectDate = new Date(p.projectStartDate);
+            projectDate.setHours(0, 0, 0, 0);
+            const todayStart = new Date(startOfDay);
+            todayStart.setHours(0, 0, 0, 0);
+            return projectDate.getTime() === todayStart.getTime();
+          } catch (error) {
+            console.error('Error filtering daily projects:', error, p.name);
+            return false;
+          }
         });
         break;
       case 'weekly':
-        filtered = allProjects.filter(p => new Date(p.projectStartDate) >= startOfWeek);
+        filtered = filtered.filter(p => {
+          try {
+            return new Date(p.projectStartDate) >= startOfWeek;
+          } catch (error) {
+            console.error('Error filtering weekly projects:', error, p.name);
+            return false;
+          }
+        });
         break;
       case 'monthly':
-        filtered = allProjects.filter(p => new Date(p.projectStartDate) >= startOfMonth);
+        filtered = filtered.filter(p => {
+          try {
+            return new Date(p.projectStartDate) >= startOfMonth;
+          } catch (error) {
+            console.error('Error filtering monthly projects:', error, p.name);
+            return false;
+          }
+        });
         break;
     }
 
-    return filtered.sort((a, b) => new Date(b.projectStartDate).getTime() - new Date(a.projectStartDate).getTime());
+    return filtered.sort((a, b) => {
+      try {
+        return new Date(b.projectStartDate).getTime() - new Date(a.projectStartDate).getTime();
+      } catch (error) {
+        console.error('Error sorting projects:', error);
+        return 0;
+      }
+    });
   }, [allProjects, selectedPeriod]);
 
   const revenueStats = useMemo((): RevenueStats => {

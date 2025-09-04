@@ -42,12 +42,21 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
         // Normalize dates
         const normalizedProjects = projects.map(p => {
           try {
+            // Ensure all required properties exist
+            const createdAt = p.createdAt ? new Date(p.createdAt) : new Date();
+            const projectStartDate = p.projectStartDate 
+              ? new Date(p.projectStartDate) 
+              : (p as any).startDate 
+                ? new Date((p as any).startDate)
+                : createdAt;
+            
             return {
               ...p,
-              createdAt: new Date(p.createdAt),
-              projectStartDate: p.projectStartDate ? new Date(p.projectStartDate) : new Date(p.createdAt),
+              createdAt,
+              projectStartDate,
               completedAt: p.completedAt ? new Date(p.completedAt) : undefined,
               client: p.client || 'Bottomline',
+              totalRevenue: p.totalRevenue || 0,
               changeOrders: (p.changeOrders || []).map(co => ({
                 ...co,
                 date: new Date(co.date)
@@ -55,7 +64,8 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
               expenses: (p.expenses || []).map(e => ({
                 ...e,
                 date: new Date(e.date)
-              }))
+              })),
+              isCompleted: p.isCompleted || false
             };
           } catch (normalizationError) {
             console.error('❌ Error normalizing project:', p.name, normalizationError);
