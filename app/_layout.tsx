@@ -3,7 +3,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, Component, ReactNode } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { ProjectProvider } from "@/hooks/project-store";
 import { theme } from "@/constants/theme";
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -31,10 +31,25 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
     if (this.state.hasError) {
       return (
         <View style={errorStyles.container}>
-          <Text style={errorStyles.title}>Something went wrong</Text>
+          <Text style={errorStyles.title}>App Crashed</Text>
           <Text style={errorStyles.message}>
             {this.state.error?.message || 'An unexpected error occurred'}
           </Text>
+          <TouchableOpacity 
+            style={errorStyles.button}
+            onPress={() => {
+              this.setState({ hasError: false, error: undefined });
+              // Try to clear storage if there's a critical error
+              AsyncStorage.removeItem('homeslam_projects').catch(console.error);
+            }}
+          >
+            <Text style={errorStyles.buttonText}>Clear Data & Restart</Text>
+          </TouchableOpacity>
+          {__DEV__ && (
+            <Text style={errorStyles.debugText}>
+              {this.state.error?.stack}
+            </Text>
+          )}
         </View>
       );
     }
@@ -53,7 +68,7 @@ const errorStyles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: 'bold' as const,
     color: theme.colors.error,
     marginBottom: 16,
   },
@@ -61,6 +76,26 @@ const errorStyles = StyleSheet.create({
     fontSize: 16,
     color: theme.colors.text,
     textAlign: 'center',
+    marginBottom: 24,
+  },
+  button: {
+    backgroundColor: theme.colors.error,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  buttonText: {
+    color: theme.colors.surface,
+    fontSize: 16,
+    fontWeight: '600' as const,
+  },
+  debugText: {
+    fontSize: 12,
+    color: theme.colors.textLight,
+    textAlign: 'center',
+    fontFamily: 'monospace',
+    marginTop: 16,
   },
 });
 

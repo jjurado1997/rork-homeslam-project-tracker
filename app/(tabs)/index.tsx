@@ -10,11 +10,12 @@ import { StatsOverview } from '@/components/StatsOverview';
 
 export default function ProjectsScreen() {
   const router = useRouter();
-  const { projects, allProjects, isLoading } = useProjects();
+  const { projects, allProjects, isLoading, error, clearAllData } = useProjects();
   
   // Debug logging
   console.log('🏠 ProjectsScreen render:', {
     isLoading,
+    error: error ? String(error) : null,
     projectsCount: projects.length,
     allProjectsCount: allProjects.length,
     projectNames: projects.map(p => p.name)
@@ -24,10 +25,43 @@ export default function ProjectsScreen() {
     router.push('/add-project');
   };
 
+  const handleRecovery = async () => {
+    try {
+      await clearAllData();
+      // Force a page refresh by navigating to debug and back
+      router.push('/debug');
+    } catch (err) {
+      console.error('Recovery failed:', err);
+    }
+  };
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.secondary} />
+        <Text style={styles.loadingText}>Loading projects...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorTitle}>App Loading Error</Text>
+        <Text style={styles.errorMessage}>
+          There was an issue loading your data. This might be due to corrupted storage.
+        </Text>
+        <TouchableOpacity style={styles.recoveryButton} onPress={handleRecovery}>
+          <Text style={styles.recoveryButtonText}>Clear Data & Restart</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.debugButton} onPress={() => router.push('/debug')}>
+          <Text style={styles.debugButtonText}>Open Debug Screen</Text>
+        </TouchableOpacity>
+        {__DEV__ && (
+          <Text style={styles.debugError}>
+            Error: {String(error)}
+          </Text>
+        )}
       </View>
     );
   }
@@ -85,6 +119,63 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: theme.colors.background,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: theme.colors.text,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.xl,
+    backgroundColor: theme.colors.background,
+  },
+  errorTitle: {
+    fontSize: theme.fontSize.xl,
+    fontWeight: '600' as const,
+    color: theme.colors.error,
+    marginBottom: theme.spacing.md,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    fontSize: theme.fontSize.md,
+    color: theme.colors.text,
+    textAlign: 'center',
+    marginBottom: theme.spacing.xl,
+    lineHeight: 22,
+  },
+  recoveryButton: {
+    backgroundColor: theme.colors.error,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    borderRadius: 8,
+    marginBottom: theme.spacing.md,
+  },
+  recoveryButtonText: {
+    color: theme.colors.surface,
+    fontSize: theme.fontSize.md,
+    fontWeight: '600' as const,
+  },
+  debugButton: {
+    backgroundColor: theme.colors.secondary,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    borderRadius: 8,
+    marginBottom: theme.spacing.md,
+  },
+  debugButtonText: {
+    color: theme.colors.primary,
+    fontSize: theme.fontSize.md,
+    fontWeight: '600' as const,
+  },
+  debugError: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.textLight,
+    textAlign: 'center',
+    marginTop: theme.spacing.lg,
+    fontFamily: 'monospace',
   },
   emptyList: {
     flexGrow: 1,

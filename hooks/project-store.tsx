@@ -24,12 +24,15 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'active' | 'completed'>('active');
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly'>('monthly');
   const [selectedClient, setSelectedClient] = useState<string>('all');
+  const [initError, setInitError] = useState<string | null>(null);
 
   const projectsQuery = useQuery({
     queryKey: ['projects'],
     queryFn: async () => {
       try {
         console.log('🔄 Loading projects from AsyncStorage...');
+        setInitError(null);
+        
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
         console.log('📦 Raw stored data:', stored ? 'Found data' : 'No data found');
         
@@ -37,12 +40,19 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
         
         if (stored) {
           try {
-            projects = JSON.parse(stored) as Project[];
-            console.log('✅ Successfully parsed projects:', projects.length);
-            console.log('📋 Project names:', projects.map(p => p?.name || 'Unknown'));
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) {
+              projects = parsed;
+              console.log('✅ Successfully parsed projects:', projects.length);
+              console.log('📋 Project names:', projects.map(p => p?.name || 'Unknown'));
+            } else {
+              console.warn('⚠️ Stored data is not an array, clearing...');
+              await AsyncStorage.removeItem(STORAGE_KEY);
+              return [];
+            }
           } catch (parseError) {
             console.error('❌ Error parsing stored projects:', parseError);
-            // Clear corrupted data
+            setInitError(`Parse error: ${parseError}`);
             await AsyncStorage.removeItem(STORAGE_KEY);
             return [];
           }
@@ -51,11 +61,11 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
         }
         
         // Normalize dates with better error handling
-        const normalizedProjects = projects.map(p => {
+        const normalizedProjects = projects.map((p, index) => {
           try {
             // Validate project has minimum required properties
             if (!p || typeof p !== 'object') {
-              console.warn('⚠️ Invalid project object:', p);
+              console.warn(`⚠️ Invalid project object at index ${index}:`, p);
               return null;
             }
             
@@ -69,56 +79,70 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
             
             // Validate dates are valid
             if (isNaN(createdAt.getTime())) {
-              console.warn('⚠️ Invalid createdAt date for project:', p.name);
+              console.warn(`⚠️ Invalid createdAt date for project ${index}:`, p.name);
               return null;
             }
             if (isNaN(projectStartDate.getTime())) {
-              console.warn('⚠️ Invalid projectStartDate for project:', p.name);
+              console.warn(`⚠️ Invalid projectStartDate for project ${index}:`, p.name);
               return null;
             }
             
             return {
-              id: p.id || Date.now().toString(),
-              name: p.name || 'Unnamed Project',
+              id: p.id || `project_${Date.now()}_${index}`,
+              name: p.name || `Unnamed Project ${index + 1}`,
               address: p.address || '',
               client: p.client || 'Bottomline',
-              totalRevenue: typeof p.totalRevenue === 'number' ? p.totalRevenue : 0,
+              totalRevenue: typeof p.totalRevenue === 'number' && !isNaN(p.totalRevenue) ? p.totalRevenue : 0,
               createdAt,
               projectStartDate,
               completedAt: p.completedAt ? new Date(p.completedAt) : undefined,
               isCompleted: Boolean(p.isCompleted),
               notes: p.notes || '',
-              changeOrders: Array.isArray(p.changeOrders) ? p.changeOrders.map(co => {
+              changeOrders: Array.isArray(p.changeOrders) ? p.changeOrders.map((co, coIndex) => {
                 try {
                   return {
-                    ...co,
-                    date: new Date(co.date)
+                    id: co.id || `co_${Date.now()}_${coIndex}`,
+                    description: co.description || '',
+                    amount: typeof co.amount === 'number' && !isNaN(co.amount) ? co.amount : 0,
+                    date: co.date ? new Date(co.date) : new Date(),
+                    approved: Boolean(co.approved)
                   };
                 } catch (coError) {
-                  console.warn('⚠️ Invalid change order date:', co);
+                  console.warn(`⚠️ Invalid change order at index ${coIndex}:`, co);
                   return {
-                    ...co,
-                    date: new Date()
+                    id: `co_${Date.now()}_${coIndex}`,
+                    description: 'Invalid Change Order',
+                    amount: 0,
+                    date: new Date(),
+                    approved: false
                   };
                 }
               }) : [],
-              expenses: Array.isArray(p.expenses) ? p.expenses.map(e => {
+              expenses: Array.isArray(p.expenses) ? p.expenses.map((e, eIndex) => {
                 try {
                   return {
-                    ...e,
-                    date: new Date(e.date)
+                    id: e.id || `expense_${Date.now()}_${eIndex}`,
+                    category: e.category || 'other',
+                    subcategory: e.subcategory || 'Miscellaneous',
+                    amount: typeof e.amount === 'number' && !isNaN(e.amount) ? e.amount : 0,
+                    description: e.description || '',
+                    date: e.date ? new Date(e.date) : new Date()
                   };
                 } catch (eError) {
-                  console.warn('⚠️ Invalid expense date:', e);
+                  console.warn(`⚠️ Invalid expense at index ${eIndex}:`, e);
                   return {
-                    ...e,
+                    id: `expense_${Date.now()}_${eIndex}`,
+                    category: 'other' as const,
+                    subcategory: 'Miscellaneous',
+                    amount: 0,
+                    description: 'Invalid Expense',
                     date: new Date()
                   };
                 }
               }) : []
             };
           } catch (normalizationError) {
-            console.error('❌ Error normalizing project:', p?.name || 'Unknown', normalizationError);
+            console.error(`❌ Error normalizing project at index ${index}:`, p?.name || 'Unknown', normalizationError);
             return null;
           }
         }).filter(Boolean) as Project[];
@@ -127,13 +151,14 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
         return normalizedProjects;
       } catch (error) {
         console.error('💥 Critical error loading projects:', error);
+        setInitError(`Critical error: ${error}`);
         return [];
       }
     },
-    retry: 1,
-    retryDelay: 500,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000 // 10 minutes
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000
   });
 
   const saveMutation = useMutation({
@@ -385,6 +410,7 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     projects: filteredProjects,
     allProjects: projects,
     isLoading: projectsQuery.isLoading,
+    error: projectsQuery.error || initError,
     selectedFilter,
     setSelectedFilter,
     selectedPeriod,
@@ -403,5 +429,6 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     completeProject,
     reopenProject,
     calculateStats,
+    clearAllData: clearStorageIfCorrupted,
   };
 });
