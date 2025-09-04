@@ -6,6 +6,17 @@ import { Project, Expense, ProjectStats, ChangeOrder } from '@/types/project';
 
 const STORAGE_KEY = 'homeslam_projects';
 
+// Recovery function to clear corrupted data
+const clearStorageIfCorrupted = async () => {
+  try {
+    console.log('🩹 Attempting to clear potentially corrupted storage...');
+    await AsyncStorage.removeItem(STORAGE_KEY);
+    console.log('✅ Storage cleared successfully');
+  } catch (error) {
+    console.error('❌ Error clearing storage:', error);
+  }
+};
+
 
 
 export const [ProjectProvider, useProjects] = createContextHook(() => {
@@ -28,7 +39,7 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
           try {
             projects = JSON.parse(stored) as Project[];
             console.log('✅ Successfully parsed projects:', projects.length);
-            console.log('📋 Project names:', projects.map(p => p.name));
+            console.log('📋 Project names:', projects.map(p => p?.name || 'Unknown'));
           } catch (parseError) {
             console.error('❌ Error parsing stored projects:', parseError);
             // Clear corrupted data
@@ -39,10 +50,16 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
           console.log('📝 No projects found in storage, starting fresh');
         }
         
-        // Normalize dates
+        // Normalize dates with better error handling
         const normalizedProjects = projects.map(p => {
           try {
-            // Ensure all required properties exist
+            // Validate project has minimum required properties
+            if (!p || typeof p !== 'object') {
+              console.warn('⚠️ Invalid project object:', p);
+              return null;
+            }
+            
+            // Ensure all required properties exist with safe defaults
             const createdAt = p.createdAt ? new Date(p.createdAt) : new Date();
             const projectStartDate = p.projectStartDate 
               ? new Date(p.projectStartDate) 
@@ -50,25 +67,58 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
                 ? new Date((p as any).startDate)
                 : createdAt;
             
+            // Validate dates are valid
+            if (isNaN(createdAt.getTime())) {
+              console.warn('⚠️ Invalid createdAt date for project:', p.name);
+              return null;
+            }
+            if (isNaN(projectStartDate.getTime())) {
+              console.warn('⚠️ Invalid projectStartDate for project:', p.name);
+              return null;
+            }
+            
             return {
-              ...p,
+              id: p.id || Date.now().toString(),
+              name: p.name || 'Unnamed Project',
+              address: p.address || '',
+              client: p.client || 'Bottomline',
+              totalRevenue: typeof p.totalRevenue === 'number' ? p.totalRevenue : 0,
               createdAt,
               projectStartDate,
               completedAt: p.completedAt ? new Date(p.completedAt) : undefined,
-              client: p.client || 'Bottomline',
-              totalRevenue: p.totalRevenue || 0,
-              changeOrders: (p.changeOrders || []).map(co => ({
-                ...co,
-                date: new Date(co.date)
-              })),
-              expenses: (p.expenses || []).map(e => ({
-                ...e,
-                date: new Date(e.date)
-              })),
-              isCompleted: p.isCompleted || false
+              isCompleted: Boolean(p.isCompleted),
+              notes: p.notes || '',
+              changeOrders: Array.isArray(p.changeOrders) ? p.changeOrders.map(co => {
+                try {
+                  return {
+                    ...co,
+                    date: new Date(co.date)
+                  };
+                } catch (coError) {
+                  console.warn('⚠️ Invalid change order date:', co);
+                  return {
+                    ...co,
+                    date: new Date()
+                  };
+                }
+              }) : [],
+              expenses: Array.isArray(p.expenses) ? p.expenses.map(e => {
+                try {
+                  return {
+                    ...e,
+                    date: new Date(e.date)
+                  };
+                } catch (eError) {
+                  console.warn('⚠️ Invalid expense date:', e);
+                  return {
+                    ...e,
+                    date: new Date()
+                  };
+                }
+              }) : []
             };
           } catch (normalizationError) {
-            console.error('❌ Error normalizing project:', p.name, normalizationError);
+            console.error('❌ Error normalizing project:', p?.name || 'Unknown', normalizationError);
             return null;
           }
         }).filter(Boolean) as Project[];
@@ -80,10 +130,10 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
         return [];
       }
     },
-    retry: 3,
-    retryDelay: 1000,
-    staleTime: 0, // Always refetch to ensure fresh data
-    gcTime: 0 // Don't cache in memory to prevent stale data
+    retry: 1,
+    retryDelay: 500,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000 // 10 minutes
   });
 
   const saveMutation = useMutation({

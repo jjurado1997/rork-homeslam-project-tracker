@@ -3,9 +3,10 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, Component, ReactNode } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
 import { ProjectProvider } from "@/hooks/project-store";
 import { theme } from "@/constants/theme";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -65,7 +66,20 @@ const errorStyles = StyleSheet.create({
 
 SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      retryDelay: 500,
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+    },
+    mutations: {
+      retry: 1,
+      retryDelay: 500,
+    },
+  },
+});
 
 function RootLayoutNav() {
   return (
@@ -124,13 +138,30 @@ function RootLayoutNav() {
           presentation: 'modal',
         }} 
       />
+      <Stack.Screen 
+        name="debug" 
+        options={{ 
+          title: "Debug & Recovery",
+          presentation: 'modal',
+        }} 
+      />
     </Stack>
   );
 }
 
 export default function RootLayout() {
   useEffect(() => {
-    SplashScreen.hideAsync();
+    const initializeApp = async () => {
+      try {
+        console.log('🚀 Initializing app...');
+        await SplashScreen.hideAsync();
+        console.log('✅ App initialized successfully');
+      } catch (error) {
+        console.error('❌ Error initializing app:', error);
+      }
+    };
+    
+    initializeApp();
   }, []);
 
   return (
