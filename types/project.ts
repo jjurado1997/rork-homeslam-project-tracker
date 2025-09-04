@@ -34,7 +34,8 @@ export const CLIENTS = [
   'Sunnon',
   'T. R. Lawing Realty',
   'Dembeck Realty',
-  'Peter Mehta'
+  'Peter Mehta',
+  'Delta Operating Management'
 ] as const;
 
 export type Client = typeof CLIENTS[number];
