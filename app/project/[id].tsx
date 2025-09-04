@@ -172,7 +172,7 @@ export default function ProjectDetailScreen() {
         )}
         <View style={styles.dateRow}>
           <Calendar size={16} color={theme.colors.textLight} />
-          <Text style={styles.date}>Created: {formatDate(project.projectStartDate)}</Text>
+          <Text style={styles.date}>Project start: {formatDate(project.projectStartDate)}</Text>
         </View>
         {project.isCompleted && project.completedAt && (
           <View style={styles.completedBadge}>

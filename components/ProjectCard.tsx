@@ -42,7 +42,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
           )}
           <Text style={styles.title} numberOfLines={1}>{project.name}</Text>
         </View>
-        <Text style={styles.date}>Created: {formatDate(project.projectStartDate)}</Text>
+        <Text style={styles.date}>Project start: {formatDate(project.projectStartDate)}</Text>
       </View>
 
       <View style={styles.infoRow}>

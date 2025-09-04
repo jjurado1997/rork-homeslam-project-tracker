@@ -259,7 +259,7 @@ export const generateProjectPDF = async (project: Project, stats: ProjectStats) 
         <div class="project-title">${project.name}</div>
         ${project.address ? `<div class="project-address">${project.address}</div>` : ''}
         <div class="project-dates">
-          Created: ${formatDate(project.projectStartDate)}
+          Project start: ${formatDate(project.projectStartDate)}
           ${project.completedAt ? ` • Completed: ${formatDate(project.completedAt)}` : ''}
         </div>
         <div class="status-badge">
