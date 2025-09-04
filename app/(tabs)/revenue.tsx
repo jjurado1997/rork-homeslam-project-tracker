@@ -43,7 +43,7 @@ export default function RevenueScreen() {
     switch (selectedPeriod) {
       case 'daily':
         filtered = allProjects.filter(p => {
-          const projectDate = new Date(p.createdAt);
+          const projectDate = new Date(p.startDate);
           projectDate.setHours(0, 0, 0, 0);
           const todayStart = new Date(startOfDay);
           todayStart.setHours(0, 0, 0, 0);
@@ -51,14 +51,14 @@ export default function RevenueScreen() {
         });
         break;
       case 'weekly':
-        filtered = allProjects.filter(p => p.createdAt >= startOfWeek);
+        filtered = allProjects.filter(p => new Date(p.startDate) >= startOfWeek);
         break;
       case 'monthly':
-        filtered = allProjects.filter(p => p.createdAt >= startOfMonth);
+        filtered = allProjects.filter(p => new Date(p.startDate) >= startOfMonth);
         break;
     }
 
-    return filtered.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return filtered.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
   }, [allProjects, selectedPeriod]);
 
   const revenueStats = useMemo((): RevenueStats => {
