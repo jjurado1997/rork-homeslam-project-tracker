@@ -10,12 +10,13 @@ import { StatsOverview } from '@/components/StatsOverview';
 
 export default function ProjectsScreen() {
   const router = useRouter();
-  const { projects, allProjects, isLoading, error, clearAllData } = useProjects();
+  const { projects, allProjects, isLoading, error, isRecovering, clearAllData } = useProjects();
   
   // Debug logging
   console.log('🏠 ProjectsScreen render:', {
     isLoading,
     error: error ? String(error) : null,
+    isRecovering,
     projectsCount: projects.length,
     allProjectsCount: allProjects.length,
     projectNames: projects.map(p => p.name)
@@ -39,23 +40,33 @@ export default function ProjectsScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.secondary} />
-        <Text style={styles.loadingText}>Loading projects...</Text>
+        <Text style={styles.loadingText}>
+          {isRecovering ? 'Recovering from data issues...' : 'Loading projects...'}
+        </Text>
+        {isRecovering && (
+          <Text style={styles.recoveryText}>
+            Your data is being restored. This may take a moment.
+          </Text>
+        )}
       </View>
     );
   }
 
-  if (error) {
+  if (error && !isRecovering) {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorTitle}>App Loading Error</Text>
         <Text style={styles.errorMessage}>
-          There was an issue loading your data. This might be due to corrupted storage.
+          There was an issue loading your data. The app has attempted automatic recovery.
         </Text>
         <TouchableOpacity style={styles.recoveryButton} onPress={handleRecovery}>
           <Text style={styles.recoveryButtonText}>Clear Data & Restart</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.debugButton} onPress={() => router.push('/debug')}>
           <Text style={styles.debugButtonText}>Open Debug Screen</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.retryButton} onPress={() => router.replace('/(tabs)')}>
+          <Text style={styles.retryButtonText}>Try Again</Text>
         </TouchableOpacity>
         {__DEV__ && (
           <Text style={styles.debugError}>
@@ -125,6 +136,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: theme.colors.text,
   },
+  recoveryText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: theme.colors.textLight,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -167,6 +185,18 @@ const styles = StyleSheet.create({
   },
   debugButtonText: {
     color: theme.colors.primary,
+    fontSize: theme.fontSize.md,
+    fontWeight: '600' as const,
+  },
+  retryButton: {
+    backgroundColor: theme.colors.success,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    borderRadius: 8,
+    marginBottom: theme.spacing.md,
+  },
+  retryButtonText: {
+    color: theme.colors.surface,
     fontSize: theme.fontSize.md,
     fontWeight: '600' as const,
   },

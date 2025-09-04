@@ -25,6 +25,8 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
 
   componentDidCatch(error: Error, errorInfo: any) {
     console.error('Error caught by boundary:', error, errorInfo);
+    // Try to clear potentially corrupted data
+    AsyncStorage.removeItem('homeslam_projects').catch(console.error);
   }
 
   render() {
@@ -37,10 +39,16 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
           </Text>
           <TouchableOpacity 
             style={errorStyles.button}
-            onPress={() => {
-              this.setState({ hasError: false, error: undefined });
-              // Try to clear storage if there's a critical error
-              AsyncStorage.removeItem('homeslam_projects').catch(console.error);
+            onPress={async () => {
+              try {
+                await AsyncStorage.removeItem('homeslam_projects');
+                console.log('✅ Storage cleared successfully');
+                this.setState({ hasError: false, error: undefined });
+              } catch (clearError) {
+                console.error('❌ Failed to clear storage:', clearError);
+                // Still try to reset the error state
+                this.setState({ hasError: false, error: undefined });
+              }
             }}
           >
             <Text style={errorStyles.buttonText}>Clear Data & Restart</Text>

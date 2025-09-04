@@ -25,6 +25,7 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly'>('monthly');
   const [selectedClient, setSelectedClient] = useState<string>('all');
   const [initError, setInitError] = useState<string | null>(null);
+  const [isRecovering, setIsRecovering] = useState(false);
 
   const projectsQuery = useQuery({
     queryKey: ['projects'],
@@ -32,6 +33,7 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
       try {
         console.log('🔄 Loading projects from AsyncStorage...');
         setInitError(null);
+        setIsRecovering(false);
         
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
         console.log('📦 Raw stored data:', stored ? 'Found data' : 'No data found');
@@ -48,12 +50,14 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
             } else {
               console.warn('⚠️ Stored data is not an array, clearing...');
               await AsyncStorage.removeItem(STORAGE_KEY);
+              setIsRecovering(true);
               return [];
             }
           } catch (parseError) {
             console.error('❌ Error parsing stored projects:', parseError);
             setInitError(`Parse error: ${parseError}`);
             await AsyncStorage.removeItem(STORAGE_KEY);
+            setIsRecovering(true);
             return [];
           }
         } else {
@@ -152,11 +156,23 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
       } catch (error) {
         console.error('💥 Critical error loading projects:', error);
         setInitError(`Critical error: ${error}`);
+        setIsRecovering(true);
+        // Try to clear corrupted data automatically
+        try {
+          await AsyncStorage.removeItem(STORAGE_KEY);
+          console.log('🧹 Cleared corrupted storage automatically');
+        } catch (clearError) {
+          console.error('❌ Failed to clear corrupted storage:', clearError);
+        }
         return [];
       }
     },
-    retry: 2,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    retry: (failureCount, error) => {
+      // Don't retry if we're in recovery mode
+      if (isRecovering) return false;
+      return failureCount < 2;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000
   });
@@ -411,6 +427,7 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     allProjects: projects,
     isLoading: projectsQuery.isLoading,
     error: projectsQuery.error || initError,
+    isRecovering,
     selectedFilter,
     setSelectedFilter,
     selectedPeriod,
