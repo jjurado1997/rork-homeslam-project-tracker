@@ -17,46 +17,98 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
   const projectsQuery = useQuery({
     queryKey: ['projects'],
     queryFn: async () => {
-      console.log('Loading projects from local storage...');
-      const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      let projects: Project[] = [];
-      
-      if (stored) {
-        projects = JSON.parse(stored) as Project[];
-        console.log('Loaded projects:', projects.length);
+      try {
+        console.log('🔄 Loading projects from AsyncStorage...');
+        const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        console.log('📦 Raw stored data:', stored ? 'Found data' : 'No data found');
+        
+        let projects: Project[] = [];
+        
+        if (stored) {
+          try {
+            projects = JSON.parse(stored) as Project[];
+            console.log('✅ Successfully parsed projects:', projects.length);
+            console.log('📋 Project names:', projects.map(p => p.name));
+          } catch (parseError) {
+            console.error('❌ Error parsing stored projects:', parseError);
+            // Clear corrupted data
+            await AsyncStorage.removeItem(STORAGE_KEY);
+            return [];
+          }
+        } else {
+          console.log('📝 No projects found in storage, starting fresh');
+        }
+        
+        // Normalize dates
+        const normalizedProjects = projects.map(p => {
+          try {
+            return {
+              ...p,
+              createdAt: new Date(p.createdAt),
+              projectStartDate: p.projectStartDate ? new Date(p.projectStartDate) : new Date(p.createdAt),
+              completedAt: p.completedAt ? new Date(p.completedAt) : undefined,
+              client: p.client || 'Bottomline',
+              changeOrders: (p.changeOrders || []).map(co => ({
+                ...co,
+                date: new Date(co.date)
+              })),
+              expenses: (p.expenses || []).map(e => ({
+                ...e,
+                date: new Date(e.date)
+              }))
+            };
+          } catch (normalizationError) {
+            console.error('❌ Error normalizing project:', p.name, normalizationError);
+            return null;
+          }
+        }).filter(Boolean) as Project[];
+        
+        console.log('🎯 Final normalized projects:', normalizedProjects.length);
+        return normalizedProjects;
+      } catch (error) {
+        console.error('💥 Critical error loading projects:', error);
+        return [];
       }
-      
-      // Normalize dates
-      return projects.map(p => ({
-        ...p,
-        createdAt: new Date(p.createdAt),
-        projectStartDate: p.projectStartDate ? new Date(p.projectStartDate) : new Date(p.createdAt),
-        completedAt: p.completedAt ? new Date(p.completedAt) : undefined,
-        client: p.client || 'Bottomline',
-        changeOrders: (p.changeOrders || []).map(co => ({
-          ...co,
-          date: new Date(co.date)
-        })),
-        expenses: p.expenses.map(e => ({
-          ...e,
-          date: new Date(e.date)
-        }))
-      }));
-    }
+    },
+    retry: 3,
+    retryDelay: 1000,
+    staleTime: 0, // Always refetch to ensure fresh data
+    gcTime: 0 // Don't cache in memory to prevent stale data
   });
 
   const saveMutation = useMutation({
     mutationFn: async (projects: Project[]) => {
-      console.log('Saving projects to local storage:', projects.length);
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
-      console.log('Projects saved successfully');
-      return projects;
+      try {
+        console.log('💾 Saving projects to AsyncStorage:', projects.length);
+        console.log('📋 Project names being saved:', projects.map(p => p.name));
+        
+        const dataToSave = JSON.stringify(projects);
+        console.log('📦 Data size:', Math.round(dataToSave.length / 1024), 'KB');
+        
+        await AsyncStorage.setItem(STORAGE_KEY, dataToSave);
+        
+        // Verify the save worked
+        const verification = await AsyncStorage.getItem(STORAGE_KEY);
+        if (verification) {
+          const parsed = JSON.parse(verification);
+          console.log('✅ Save verification successful:', parsed.length, 'projects');
+        } else {
+          throw new Error('Save verification failed - no data found after save');
+        }
+        
+        console.log('🎉 Projects saved successfully');
+        return projects;
+      } catch (error) {
+        console.error('💥 Critical error saving projects:', error);
+        throw error;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('🔄 Invalidating queries after successful save');
       queryClient.invalidateQueries({ queryKey: ['projects'] });
     },
     onError: (error) => {
-      console.error('Save mutation error:', error);
+      console.error('❌ Save mutation error:', error);
     }
   });
 

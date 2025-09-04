@@ -10,7 +10,15 @@ import { StatsOverview } from '@/components/StatsOverview';
 
 export default function ProjectsScreen() {
   const router = useRouter();
-  const { projects, isLoading } = useProjects();
+  const { projects, allProjects, isLoading } = useProjects();
+  
+  // Debug logging
+  console.log('🏠 ProjectsScreen render:', {
+    isLoading,
+    projectsCount: projects.length,
+    allProjectsCount: allProjects.length,
+    projectNames: projects.map(p => p.name)
+  });
 
   const handleAddProject = () => {
     router.push('/add-project');
@@ -40,8 +48,17 @@ export default function ProjectsScreen() {
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyTitle}>No projects found</Text>
             <Text style={styles.emptyText}>
-              Tap the + button to create your first project
+              {allProjects.length > 0 
+                ? `${allProjects.length} projects exist but none match current filters`
+                : 'Tap the + button to create your first project'
+              }
             </Text>
+            {__DEV__ && (
+              <Text style={styles.debugText}>
+                Debug: Loading={isLoading ? 'true' : 'false'}, 
+                All={allProjects.length}, Filtered={projects.length}
+              </Text>
+            )}
           </View>
         }
         contentContainerStyle={projects.length === 0 ? styles.emptyList : undefined}
@@ -89,6 +106,13 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.md,
     color: theme.colors.textLight,
     textAlign: 'center',
+  },
+  debugText: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.textLight,
+    textAlign: 'center',
+    marginTop: theme.spacing.md,
+    fontFamily: 'monospace',
   },
   fab: {
     position: 'absolute',
