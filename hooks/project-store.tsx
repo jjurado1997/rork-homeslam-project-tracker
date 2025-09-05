@@ -61,23 +61,30 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     },
     retryDelay: 2000,
     staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-    onSuccess: (data) => {
+    gcTime: 10 * 60 * 1000
+  });
+
+  // Handle query success and error states
+  useEffect(() => {
+    if (projectsQuery.isSuccess && projectsQuery.data) {
       console.log('🌐 Backend connected successfully');
       setIsOnline(true);
       setLastSyncTime(new Date());
       // Sync backend data to local storage
-      if (data && data.length > 0) {
-        AsyncStorage.setItem('homeslam_projects', JSON.stringify(data))
+      if (projectsQuery.data.length > 0) {
+        AsyncStorage.setItem('homeslam_projects', JSON.stringify(projectsQuery.data))
           .then(() => console.log('💾 Synced backend data to local storage'))
-          .catch(err => console.error('❌ Failed to sync to local:', err));
+          .catch((err: Error) => console.error('❌ Failed to sync to local:', err));
       }
-    },
-    onError: (error) => {
-      console.log('🔌 Backend connection failed, using offline mode:', error.message);
+    }
+  }, [projectsQuery.isSuccess, projectsQuery.data]);
+
+  useEffect(() => {
+    if (projectsQuery.isError) {
+      console.log('🔌 Backend connection failed, using offline mode:', projectsQuery.error?.message);
       setIsOnline(false);
     }
-  });
+  }, [projectsQuery.isError, projectsQuery.error]);
 
   // Backend mutations
   const createProjectMutation = trpc.projects.create.useMutation({
