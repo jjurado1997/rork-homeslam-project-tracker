@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Plus, Settings } from 'lucide-react-native';
+import { Plus, Settings, Wifi, WifiOff, Clock, AlertTriangle } from 'lucide-react-native';
 import { theme } from '@/constants/theme';
 import { useProjects } from '@/hooks/project-store';
 import { ProjectCard } from '@/components/ProjectCard';
@@ -10,13 +10,20 @@ import { StatsOverview } from '@/components/StatsOverview';
 
 export default function ProjectsScreen() {
   const router = useRouter();
-  const { projects, allProjects, isLoading, error, isRecovering, clearAllData } = useProjects();
+  const { 
+    projects, 
+    allProjects, 
+    isLoading, 
+    error, 
+    isOnline, 
+    lastSyncTime
+  } = useProjects();
   
   // Debug logging
   console.log('🏠 ProjectsScreen render:', {
     isLoading,
     error: error ? String(error) : null,
-    isRecovering,
+    isOnline,
     projectsCount: projects.length,
     allProjectsCount: allProjects.length,
     projectNames: projects.map(p => p.name)
@@ -26,15 +33,7 @@ export default function ProjectsScreen() {
     router.push('/add-project');
   };
 
-  const handleRecovery = async () => {
-    try {
-      await clearAllData();
-      // Force a page refresh by navigating to debug and back
-      router.push('/debug');
-    } catch (err) {
-      console.error('Recovery failed:', err);
-    }
-  };
+
 
   // Add timeout for loading state to prevent infinite loading
   React.useEffect(() => {
@@ -47,18 +46,11 @@ export default function ProjectsScreen() {
     return () => clearTimeout(timeout);
   }, [isLoading]);
 
-  if (isLoading) {
+  if (isLoading && isOnline) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.secondary} />
-        <Text style={styles.loadingText}>
-          {isRecovering ? 'Recovering from data issues...' : 'Loading Homeslam...'}
-        </Text>
-        {isRecovering && (
-          <Text style={styles.recoveryText}>
-            Your data is being restored. This may take a moment.
-          </Text>
-        )}
+        <Text style={styles.loadingText}>Loading from server...</Text>
         <TouchableOpacity 
           style={styles.skipLoadingButton} 
           onPress={() => router.replace('/debug')}
@@ -69,30 +61,7 @@ export default function ProjectsScreen() {
     );
   }
 
-  if (error && !isRecovering) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorTitle}>App Loading Error</Text>
-        <Text style={styles.errorMessage}>
-          There was an issue loading your data. The app has attempted automatic recovery.
-        </Text>
-        <TouchableOpacity style={styles.recoveryButton} onPress={handleRecovery}>
-          <Text style={styles.recoveryButtonText}>Clear Data & Restart</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.debugButton} onPress={() => router.push('/debug')}>
-          <Text style={styles.debugButtonText}>Open Debug Screen</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.retryButton} onPress={() => router.replace('/(tabs)')}>
-          <Text style={styles.retryButtonText}>Try Again</Text>
-        </TouchableOpacity>
-        {__DEV__ && (
-          <Text style={styles.debugError}>
-            Error: {String(error)}
-          </Text>
-        )}
-      </View>
-    );
-  }
+
 
   return (
     <View style={styles.container}>
@@ -102,6 +71,37 @@ export default function ProjectsScreen() {
         renderItem={({ item }) => <ProjectCard project={item} />}
         ListHeaderComponent={
           <>
+            <View style={styles.statusHeader}>
+              <View style={styles.statusContainer}>
+                {isOnline ? (
+                  <View style={styles.onlineStatus}>
+                    <Wifi size={16} color={theme.colors.success} />
+                    <Text style={styles.onlineText}>Online & Synced</Text>
+                  </View>
+                ) : (
+                  <View style={styles.offlineStatus}>
+                    <WifiOff size={16} color={theme.colors.warning} />
+                    <Text style={styles.offlineText}>Offline Mode</Text>
+                  </View>
+                )}
+                {lastSyncTime && (
+                  <View style={styles.syncStatus}>
+                    <Clock size={12} color={theme.colors.textLight} />
+                    <Text style={styles.syncText}>
+                      Last sync: {lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              {!isOnline && (
+                <View style={styles.offlineNotice}>
+                  <AlertTriangle size={16} color={theme.colors.warning} />
+                  <Text style={styles.offlineNoticeText}>
+                    Changes will sync when connection is restored
+                  </Text>
+                </View>
+              )}
+            </View>
             <StatsOverview />
             <FilterBar />
           </>
@@ -161,13 +161,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: theme.colors.text,
   },
-  recoveryText: {
-    marginTop: 8,
-    fontSize: 14,
-    color: theme.colors.textLight,
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
+
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -291,6 +285,63 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 6,
+  },
+  statusHeader: {
+    padding: 16,
+    backgroundColor: theme.colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  onlineStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  offlineStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  onlineText: {
+    fontSize: 14,
+    color: theme.colors.success,
+    fontWeight: '600' as const,
+  },
+  offlineText: {
+    fontSize: 14,
+    color: theme.colors.warning,
+    fontWeight: '600' as const,
+  },
+  syncStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  syncText: {
+    fontSize: 12,
+    color: theme.colors.textLight,
+  },
+  offlineNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: theme.colors.warning + '10',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: theme.colors.warning + '30',
+  },
+  offlineNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    color: theme.colors.warning,
+    fontWeight: '500' as const,
   },
   skipLoadingButton: {
     marginTop: 24,

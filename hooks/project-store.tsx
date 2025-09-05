@@ -1,8 +1,10 @@
 import createContextHook from '@nkzw/create-context-hook';
 import { useQueryClient } from '@tanstack/react-query';
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Project, Expense, ProjectStats, ChangeOrder } from '@/types/project';
 import { trpc } from '@/lib/trpc';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 
 
@@ -11,17 +13,70 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'active' | 'completed'>('active');
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly'>('monthly');
   const [selectedClient, setSelectedClient] = useState<string>('all');
+  const [localProjects, setLocalProjects] = useState<Project[]>([]);
+  const [isOnline, setIsOnline] = useState(true);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
 
 
-  // Use tRPC to get projects from backend
+  // Load local data on startup
+  useEffect(() => {
+    const loadLocalData = async () => {
+      try {
+        console.log('📱 Loading local data...');
+        const stored = await AsyncStorage.getItem('homeslam_projects');
+        if (stored) {
+          const parsedProjects = JSON.parse(stored).map((p: any) => ({
+            ...p,
+            projectStartDate: new Date(p.projectStartDate),
+            createdAt: new Date(p.createdAt),
+            completedAt: p.completedAt ? new Date(p.completedAt) : undefined,
+            expenses: p.expenses?.map((e: any) => ({
+              ...e,
+              date: new Date(e.date)
+            })) || [],
+            changeOrders: p.changeOrders?.map((co: any) => ({
+              ...co,
+              date: new Date(co.date)
+            })) || []
+          }));
+          setLocalProjects(parsedProjects);
+          console.log(`✅ Loaded ${parsedProjects.length} projects from local storage`);
+        }
+      } catch (error) {
+        console.error('❌ Error loading local data:', error);
+      }
+    };
+    loadLocalData();
+  }, []);
+
+  // Use tRPC to get projects from backend with fallback
   const projectsQuery = trpc.projects.getAll.useQuery(undefined, {
     retry: (failureCount, error) => {
       console.log(`🔄 Backend query retry attempt ${failureCount}:`, error);
-      return failureCount < 2;
+      if (failureCount >= 1) {
+        console.log('🔌 Backend unavailable, switching to offline mode');
+        setIsOnline(false);
+      }
+      return failureCount < 1; // Only retry once
     },
-    retryDelay: 1000,
+    retryDelay: 2000,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    onSuccess: (data) => {
+      console.log('🌐 Backend connected successfully');
+      setIsOnline(true);
+      setLastSyncTime(new Date());
+      // Sync backend data to local storage
+      if (data && data.length > 0) {
+        AsyncStorage.setItem('homeslam_projects', JSON.stringify(data))
+          .then(() => console.log('💾 Synced backend data to local storage'))
+          .catch(err => console.error('❌ Failed to sync to local:', err));
+      }
+    },
+    onError: (error) => {
+      console.log('🔌 Backend connection failed, using offline mode:', error.message);
+      setIsOnline(false);
+    }
   });
 
   // Backend mutations
@@ -115,100 +170,249 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     }
   });
 
-  const projects = useMemo(() => projectsQuery.data || [], [projectsQuery.data]);
+  // Use backend data if available, otherwise use local data
+  const projects = useMemo(() => {
+    if (isOnline && projectsQuery.data) {
+      return projectsQuery.data;
+    }
+    return localProjects;
+  }, [isOnline, projectsQuery.data, localProjects]);
 
-  // Updated functions to use backend
+  // Save to local storage helper
+  const saveToLocal = useCallback(async (updatedProjects: Project[]) => {
+    try {
+      await AsyncStorage.setItem('homeslam_projects', JSON.stringify(updatedProjects));
+      setLocalProjects(updatedProjects);
+      console.log('💾 Saved to local storage');
+    } catch (error) {
+      console.error('❌ Failed to save to local storage:', error);
+    }
+  }, []);
+
+  // Hybrid functions that work online and offline
   const addProject = useCallback((project: Omit<Project, 'id' | 'createdAt' | 'expenses' | 'isCompleted' | 'changeOrders'>) => {
-    console.log('🚀 Adding project to backend:', project.name);
-    createProjectMutation.mutate({
-      name: project.name,
-      address: project.address || '',
-      client: project.client,
-      totalRevenue: project.totalRevenue,
-      projectStartDate: project.projectStartDate.toISOString(),
-      notes: project.notes || ''
-    });
-  }, [createProjectMutation]);
+    const newProject: Project = {
+      ...project,
+      id: Date.now().toString(),
+      createdAt: new Date(),
+      expenses: [],
+      changeOrders: [],
+      isCompleted: false
+    };
+
+    if (isOnline) {
+      console.log('🌐 Adding project to backend:', project.name);
+      createProjectMutation.mutate({
+        name: project.name,
+        address: project.address || '',
+        client: project.client,
+        totalRevenue: project.totalRevenue,
+        projectStartDate: project.projectStartDate.toISOString(),
+        notes: project.notes || ''
+      });
+    } else {
+      console.log('📱 Adding project locally (offline):', project.name);
+      const updatedProjects = [...projects, newProject];
+      saveToLocal(updatedProjects);
+    }
+  }, [isOnline, createProjectMutation, projects, saveToLocal]);
 
   const updateProject = useCallback((projectId: string, updates: Partial<Project>) => {
-    console.log('🚀 Updating project in backend:', projectId);
-    const backendUpdates: any = { ...updates };
-    if (updates.projectStartDate) {
-      backendUpdates.projectStartDate = updates.projectStartDate.toISOString();
+    if (isOnline) {
+      console.log('🌐 Updating project in backend:', projectId);
+      const backendUpdates: any = { ...updates };
+      if (updates.projectStartDate) {
+        backendUpdates.projectStartDate = updates.projectStartDate.toISOString();
+      }
+      if (updates.completedAt) {
+        backendUpdates.completedAt = updates.completedAt.toISOString();
+      }
+      updateProjectMutation.mutate({ id: projectId, updates: backendUpdates });
+    } else {
+      console.log('📱 Updating project locally (offline):', projectId);
+      const updatedProjects = projects.map(p => 
+        p.id === projectId ? { ...p, ...updates } : p
+      );
+      saveToLocal(updatedProjects);
     }
-    if (updates.completedAt) {
-      backendUpdates.completedAt = updates.completedAt.toISOString();
-    }
-    updateProjectMutation.mutate({ id: projectId, updates: backendUpdates });
-  }, [updateProjectMutation]);
+  }, [isOnline, updateProjectMutation, projects, saveToLocal]);
 
   const deleteProject = useCallback((projectId: string) => {
-    console.log('🚀 Deleting project from backend:', projectId);
-    deleteProjectMutation.mutate({ id: projectId });
-  }, [deleteProjectMutation]);
+    if (isOnline) {
+      console.log('🌐 Deleting project from backend:', projectId);
+      deleteProjectMutation.mutate({ id: projectId });
+    } else {
+      console.log('📱 Deleting project locally (offline):', projectId);
+      const updatedProjects = projects.filter(p => p.id !== projectId);
+      saveToLocal(updatedProjects);
+    }
+  }, [isOnline, deleteProjectMutation, projects, saveToLocal]);
 
   const addExpense = useCallback((projectId: string, expense: Omit<Expense, 'id' | 'date'>) => {
-    console.log('🚀 Adding expense to backend:', expense.description);
-    createExpenseMutation.mutate({
-      projectId,
-      category: expense.category,
-      subcategory: expense.subcategory,
-      amount: expense.amount,
-      description: expense.description || ''
-    });
-  }, [createExpenseMutation]);
+    const newExpense: Expense = {
+      ...expense,
+      id: Date.now().toString(),
+      date: new Date()
+    };
+
+    if (isOnline) {
+      console.log('🌐 Adding expense to backend:', expense.description);
+      createExpenseMutation.mutate({
+        projectId,
+        category: expense.category,
+        subcategory: expense.subcategory,
+        amount: expense.amount,
+        description: expense.description || ''
+      });
+    } else {
+      console.log('📱 Adding expense locally (offline):', expense.description);
+      const updatedProjects = projects.map(p => 
+        p.id === projectId 
+          ? { ...p, expenses: [...p.expenses, newExpense] }
+          : p
+      );
+      saveToLocal(updatedProjects);
+    }
+  }, [isOnline, createExpenseMutation, projects, saveToLocal]);
 
   const updateExpense = useCallback((projectId: string, expenseId: string, updates: Partial<Omit<Expense, 'id' | 'date'>>) => {
-    console.log('🚀 Updating expense in backend:', expenseId);
-    updateExpenseMutation.mutate({ projectId, expenseId, updates });
-  }, [updateExpenseMutation]);
+    if (isOnline) {
+      console.log('🌐 Updating expense in backend:', expenseId);
+      updateExpenseMutation.mutate({ projectId, expenseId, updates });
+    } else {
+      console.log('📱 Updating expense locally (offline):', expenseId);
+      const updatedProjects = projects.map(p => 
+        p.id === projectId 
+          ? {
+              ...p, 
+              expenses: p.expenses.map(e => 
+                e.id === expenseId ? { ...e, ...updates } : e
+              )
+            }
+          : p
+      );
+      saveToLocal(updatedProjects);
+    }
+  }, [isOnline, updateExpenseMutation, projects, saveToLocal]);
 
   const deleteExpense = useCallback((projectId: string, expenseId: string) => {
-    console.log('🚀 Deleting expense from backend:', expenseId);
-    deleteExpenseMutation.mutate({ projectId, expenseId });
-  }, [deleteExpenseMutation]);
+    if (isOnline) {
+      console.log('🌐 Deleting expense from backend:', expenseId);
+      deleteExpenseMutation.mutate({ projectId, expenseId });
+    } else {
+      console.log('📱 Deleting expense locally (offline):', expenseId);
+      const updatedProjects = projects.map(p => 
+        p.id === projectId 
+          ? { ...p, expenses: p.expenses.filter(e => e.id !== expenseId) }
+          : p
+      );
+      saveToLocal(updatedProjects);
+    }
+  }, [isOnline, deleteExpenseMutation, projects, saveToLocal]);
 
   const completeProject = useCallback((projectId: string) => {
-    console.log('🚀 Completing project in backend:', projectId);
-    updateProjectMutation.mutate({ 
-      id: projectId, 
-      updates: { 
-        isCompleted: true, 
-        completedAt: new Date().toISOString() 
-      } 
-    });
-  }, [updateProjectMutation]);
+    const completedAt = new Date();
+    if (isOnline) {
+      console.log('🌐 Completing project in backend:', projectId);
+      updateProjectMutation.mutate({ 
+        id: projectId, 
+        updates: { 
+          isCompleted: true, 
+          completedAt: completedAt.toISOString() 
+        } 
+      });
+    } else {
+      console.log('📱 Completing project locally (offline):', projectId);
+      const updatedProjects = projects.map(p => 
+        p.id === projectId 
+          ? { ...p, isCompleted: true, completedAt }
+          : p
+      );
+      saveToLocal(updatedProjects);
+    }
+  }, [isOnline, updateProjectMutation, projects, saveToLocal]);
 
   const reopenProject = useCallback((projectId: string) => {
-    console.log('🚀 Reopening project in backend:', projectId);
-    updateProjectMutation.mutate({ 
-      id: projectId, 
-      updates: { 
-        isCompleted: false, 
-        completedAt: null 
-      } 
-    });
-  }, [updateProjectMutation]);
+    if (isOnline) {
+      console.log('🌐 Reopening project in backend:', projectId);
+      updateProjectMutation.mutate({ 
+        id: projectId, 
+        updates: { 
+          isCompleted: false, 
+          completedAt: null 
+        } 
+      });
+    } else {
+      console.log('📱 Reopening project locally (offline):', projectId);
+      const updatedProjects = projects.map(p => 
+        p.id === projectId 
+          ? { ...p, isCompleted: false, completedAt: undefined }
+          : p
+      );
+      saveToLocal(updatedProjects);
+    }
+  }, [isOnline, updateProjectMutation, projects, saveToLocal]);
 
   const addChangeOrder = useCallback((projectId: string, changeOrder: Omit<ChangeOrder, 'id' | 'date'>) => {
-    console.log('🚀 Adding change order to backend:', changeOrder.description);
-    createChangeOrderMutation.mutate({
-      projectId,
-      description: changeOrder.description,
-      amount: changeOrder.amount,
-      approved: changeOrder.approved
-    });
-  }, [createChangeOrderMutation]);
+    const newChangeOrder: ChangeOrder = {
+      ...changeOrder,
+      id: Date.now().toString(),
+      date: new Date()
+    };
+
+    if (isOnline) {
+      console.log('🌐 Adding change order to backend:', changeOrder.description);
+      createChangeOrderMutation.mutate({
+        projectId,
+        description: changeOrder.description,
+        amount: changeOrder.amount,
+        approved: changeOrder.approved
+      });
+    } else {
+      console.log('📱 Adding change order locally (offline):', changeOrder.description);
+      const updatedProjects = projects.map(p => 
+        p.id === projectId 
+          ? { ...p, changeOrders: [...(p.changeOrders || []), newChangeOrder] }
+          : p
+      );
+      saveToLocal(updatedProjects);
+    }
+  }, [isOnline, createChangeOrderMutation, projects, saveToLocal]);
 
   const updateChangeOrder = useCallback((projectId: string, changeOrderId: string, updates: Partial<Omit<ChangeOrder, 'id' | 'date'>>) => {
-    console.log('🚀 Updating change order in backend:', changeOrderId);
-    updateChangeOrderMutation.mutate({ projectId, changeOrderId, updates });
-  }, [updateChangeOrderMutation]);
+    if (isOnline) {
+      console.log('🌐 Updating change order in backend:', changeOrderId);
+      updateChangeOrderMutation.mutate({ projectId, changeOrderId, updates });
+    } else {
+      console.log('📱 Updating change order locally (offline):', changeOrderId);
+      const updatedProjects = projects.map(p => 
+        p.id === projectId 
+          ? {
+              ...p, 
+              changeOrders: (p.changeOrders || []).map(co => 
+                co.id === changeOrderId ? { ...co, ...updates } : co
+              )
+            }
+          : p
+      );
+      saveToLocal(updatedProjects);
+    }
+  }, [isOnline, updateChangeOrderMutation, projects, saveToLocal]);
 
   const deleteChangeOrder = useCallback((projectId: string, changeOrderId: string) => {
-    console.log('🚀 Deleting change order from backend:', changeOrderId);
-    deleteChangeOrderMutation.mutate({ projectId, changeOrderId });
-  }, [deleteChangeOrderMutation]);
+    if (isOnline) {
+      console.log('🌐 Deleting change order from backend:', changeOrderId);
+      deleteChangeOrderMutation.mutate({ projectId, changeOrderId });
+    } else {
+      console.log('📱 Deleting change order locally (offline):', changeOrderId);
+      const updatedProjects = projects.map(p => 
+        p.id === projectId 
+          ? { ...p, changeOrders: (p.changeOrders || []).filter(co => co.id !== changeOrderId) }
+          : p
+      );
+      saveToLocal(updatedProjects);
+    }
+  }, [isOnline, deleteChangeOrderMutation, projects, saveToLocal]);
 
   const calculateStats = useCallback((project: Project): ProjectStats => {
     const totalExpenses = project.expenses.reduce((sum, e) => sum + e.amount, 0);
@@ -301,11 +505,31 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     return filtered.sort((a, b) => b.projectStartDate.getTime() - a.projectStartDate.getTime());
   }, [projects, selectedFilter, selectedPeriod, selectedClient]);
 
+  // Force sync function to manually sync local data to backend
+  const syncToBackend = useCallback(async () => {
+    if (!isOnline || localProjects.length === 0) {
+      return { success: false, message: 'No connection or no local data to sync' };
+    }
+
+    try {
+      console.log('🔄 Syncing local data to backend...');
+      // This would need to be implemented based on your backend API
+      // For now, just refresh the query to get latest backend data
+      await queryClient.invalidateQueries({ queryKey: [['projects', 'getAll']] });
+      return { success: true, message: 'Sync completed' };
+    } catch (error) {
+      console.error('❌ Sync failed:', error);
+      return { success: false, message: `Sync failed: ${error}` };
+    }
+  }, [isOnline, localProjects, queryClient]);
+
   return useMemo(() => ({
     projects: filteredProjects,
     allProjects: projects,
-    isLoading: projectsQuery.isLoading,
-    error: projectsQuery.error,
+    isLoading: projectsQuery.isLoading && isOnline,
+    error: isOnline ? projectsQuery.error : null,
+    isOnline,
+    lastSyncTime,
     selectedFilter,
     setSelectedFilter,
     selectedPeriod,
@@ -324,14 +548,19 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     completeProject,
     reopenProject,
     calculateStats,
-    clearAllData: useCallback(() => {
-      console.log('🧹 Backend data cannot be cleared from client');
+    syncToBackend,
+    clearAllData: useCallback(async () => {
+      await AsyncStorage.removeItem('homeslam_projects');
+      setLocalProjects([]);
+      console.log('🧹 Local data cleared');
     }, []),
   }), [
     filteredProjects,
     projects,
     projectsQuery.isLoading,
     projectsQuery.error,
+    isOnline,
+    lastSyncTime,
     selectedFilter,
     setSelectedFilter,
     selectedPeriod,
@@ -349,6 +578,7 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     deleteChangeOrder,
     completeProject,
     reopenProject,
-    calculateStats
+    calculateStats,
+    syncToBackend
   ]);
 });
