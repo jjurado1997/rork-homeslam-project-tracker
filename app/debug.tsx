@@ -54,7 +54,13 @@ export default function DebugScreen() {
         'projects', 
         'HomeSlam_projects',
         'homeslam_data',
-        'app_data'
+        'app_data',
+        'project_data',
+        'construction_projects',
+        'user_projects',
+        'saved_projects',
+        'project_store',
+        'app_projects'
       ];
       
       let foundData = null;
@@ -73,6 +79,32 @@ export default function DebugScreen() {
       // Also check all keys in AsyncStorage
       const allKeys = await AsyncStorage.getAllKeys();
       console.log('📋 All AsyncStorage keys:', allKeys);
+      
+      // Check if any keys contain project-related data
+      if (!foundData && allKeys.length > 0) {
+        console.log('🔍 Scanning all keys for project data...');
+        for (const key of allKeys) {
+          try {
+            const data = await AsyncStorage.getItem(key);
+            if (data) {
+              const parsed = JSON.parse(data);
+              // Check if this looks like project data
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                const firstItem = parsed[0];
+                if (firstItem && typeof firstItem === 'object' && 
+                    (firstItem.name || firstItem.client || firstItem.totalRevenue !== undefined || firstItem.expenses)) {
+                  console.log(`🎯 Found potential project data in key: ${key}`);
+                  foundData = data;
+                  foundKey = key;
+                  break;
+                }
+              }
+            }
+          } catch (e) {
+            // Skip invalid JSON
+          }
+        }
+      }
       
       let info: DebugInfo = {
         storageSize: '0 KB',
@@ -214,17 +246,29 @@ export default function DebugScreen() {
       
       const parsed = JSON.parse(importDataText.trim());
       
-      // Validate backup format
-      if (!parsed.projects || !Array.isArray(parsed.projects)) {
-        throw new Error('Invalid backup format: missing projects array');
+      let projectsToImport: any[] = [];
+      
+      // Handle different backup formats
+      if (parsed.projects && Array.isArray(parsed.projects)) {
+        // Standard backup format
+        projectsToImport = parsed.projects;
+      } else if (Array.isArray(parsed)) {
+        // Direct array format
+        projectsToImport = parsed;
+      } else {
+        throw new Error('Invalid backup format: no projects array found');
+      }
+      
+      if (projectsToImport.length === 0) {
+        throw new Error('No projects found in backup data');
       }
       
       // Save the imported projects
-      await AsyncStorage.setItem('homeslam_projects', JSON.stringify(parsed.projects));
+      await AsyncStorage.setItem('homeslam_projects', JSON.stringify(projectsToImport));
       
       Alert.alert(
         'Success!', 
-        `Imported ${parsed.projects.length} projects successfully! The app will refresh now.`,
+        `Imported ${projectsToImport.length} projects successfully! The app will refresh now.`,
         [{
           text: 'OK',
           onPress: () => {
@@ -355,6 +399,65 @@ export default function DebugScreen() {
           <Download size={20} color={theme.colors.secondary} />
           <Text style={styles.actionButtonText}>
             {isExporting ? 'Exporting...' : 'Export/Backup Data'}
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.recoveryButton]} 
+          onPress={async () => {
+            try {
+              setIsLoading(true);
+              const allKeys = await AsyncStorage.getAllKeys();
+              let recoveredData = null;
+              let recoveredKey = null;
+              
+              // Scan all keys for project-like data
+              for (const key of allKeys) {
+                try {
+                  const data = await AsyncStorage.getItem(key);
+                  if (data) {
+                    const parsed = JSON.parse(data);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                      const firstItem = parsed[0];
+                      if (firstItem && typeof firstItem === 'object' && 
+                          (firstItem.name || firstItem.client || firstItem.totalRevenue !== undefined)) {
+                        recoveredData = parsed;
+                        recoveredKey = key;
+                        break;
+                      }
+                    }
+                  }
+                } catch (e) {
+                  // Skip invalid data
+                }
+              }
+              
+              if (recoveredData && recoveredKey) {
+                await AsyncStorage.setItem('homeslam_projects', JSON.stringify(recoveredData));
+                Alert.alert(
+                  'Recovery Successful!',
+                  `Found and recovered ${recoveredData.length} projects from storage key: ${recoveredKey}`,
+                  [{
+                    text: 'OK',
+                    onPress: () => {
+                      loadDebugInfo();
+                      router.replace('/(tabs)');
+                    }
+                  }]
+                );
+              } else {
+                Alert.alert('No Data Found', 'Could not find any recoverable project data in storage.');
+              }
+            } catch (error) {
+              Alert.alert('Recovery Failed', `Error during recovery: ${error}`);
+            } finally {
+              setIsLoading(false);
+            }
+          }}
+        >
+          <RefreshCw size={20} color={theme.colors.success} />
+          <Text style={[styles.actionButtonText, { color: theme.colors.success }]}>
+            Auto-Recover Data
           </Text>
         </TouchableOpacity>
         
@@ -568,6 +671,11 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: theme.colors.surface,
+  },
+  recoveryButton: {
+    backgroundColor: theme.colors.success + '20',
+    borderWidth: 2,
+    borderColor: theme.colors.success,
   },
   successButton: {
     backgroundColor: theme.colors.success,
