@@ -5,6 +5,7 @@ import React, { useEffect, Component, ReactNode } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { ProjectProvider } from "@/hooks/project-store";
+import { trpc, trpcClient } from "@/lib/trpc";
 import { theme } from "@/constants/theme";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -192,6 +193,13 @@ function RootLayoutNav() {
           presentation: 'modal',
         }} 
       />
+      <Stack.Screen 
+        name="backend-test" 
+        options={{ 
+          title: "Backend Test",
+          presentation: 'modal',
+        }} 
+      />
     </Stack>
   );
 }
@@ -228,13 +236,15 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <ProjectProvider>
-          <GestureHandlerRootView style={{ flex: 1 }}>
-            <RootLayoutNav />
-          </GestureHandlerRootView>
-        </ProjectProvider>
-      </QueryClientProvider>
+      <trpc.Provider client={trpcClient} queryClient={queryClient}>
+        <QueryClientProvider client={queryClient}>
+          <ProjectProvider>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <RootLayoutNav />
+            </GestureHandlerRootView>
+          </ProjectProvider>
+        </QueryClientProvider>
+      </trpc.Provider>
     </ErrorBoundary>
   );
 }
