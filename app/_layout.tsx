@@ -201,15 +201,25 @@ export default function RootLayout() {
     const initializeApp = async () => {
       try {
         console.log('🚀 Initializing app...');
-        // Add a small delay to ensure everything is ready
+        // Shorter delay for mobile
         setTimeout(async () => {
-          await SplashScreen.hideAsync();
-          console.log('✅ App initialized successfully');
-        }, 100);
+          try {
+            await SplashScreen.hideAsync();
+            console.log('✅ App initialized successfully');
+          } catch (splashError) {
+            console.warn('⚠️ Splash screen error (non-critical):', splashError);
+          }
+        }, 50); // Reduced from 100ms to 50ms
       } catch (error) {
         console.error('❌ Error initializing app:', error);
-        // Still hide splash screen even if there's an error
-        setTimeout(() => SplashScreen.hideAsync(), 500);
+        // Force hide splash screen after short delay
+        setTimeout(() => {
+          try {
+            SplashScreen.hideAsync();
+          } catch (splashError) {
+            console.warn('⚠️ Failed to hide splash screen:', splashError);
+          }
+        }, 200); // Reduced from 500ms to 200ms
       }
     };
     

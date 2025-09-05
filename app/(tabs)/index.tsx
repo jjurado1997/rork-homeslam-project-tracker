@@ -36,6 +36,17 @@ export default function ProjectsScreen() {
     }
   };
 
+  // Add timeout for loading state to prevent infinite loading
+  React.useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (isLoading) {
+        console.log('⏰ Loading timeout reached, forcing app to show content');
+      }
+    }, 5000); // 5 second timeout
+    
+    return () => clearTimeout(timeout);
+  }, [isLoading]);
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -48,6 +59,12 @@ export default function ProjectsScreen() {
             Your data is being restored. This may take a moment.
           </Text>
         )}
+        <TouchableOpacity 
+          style={styles.skipLoadingButton} 
+          onPress={() => router.replace('/debug')}
+        >
+          <Text style={styles.skipLoadingText}>Having trouble? Tap here</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -274,5 +291,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 6,
+  },
+  skipLoadingButton: {
+    marginTop: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: theme.colors.warning,
+    borderRadius: 8,
+  },
+  skipLoadingText: {
+    color: theme.colors.primary,
+    fontSize: 16,
+    fontWeight: '600' as const,
   },
 });

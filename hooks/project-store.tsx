@@ -35,7 +35,14 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
         setInitError(null);
         setIsRecovering(false);
         
-        const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        // Add timeout to prevent hanging on mobile
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('AsyncStorage timeout')), 10000);
+        });
+        
+        const storagePromise = AsyncStorage.getItem(STORAGE_KEY);
+        const stored = await Promise.race([storagePromise, timeoutPromise]) as string | null;
+        
         console.log('📦 Raw stored data:', stored ? 'Found data' : 'No data found');
         
         let projects: Project[] = [];
@@ -169,9 +176,14 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
         return [];
       }
     },
-    retry: false, // Disable retries to prevent infinite loops
+    retry: (failureCount, error) => {
+      console.log(`🔄 Query retry attempt ${failureCount}:`, error);
+      return failureCount < 2; // Allow 2 retries max
+    },
+    retryDelay: 1000,
     staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000
+    gcTime: 10 * 60 * 1000,
+    networkMode: 'always' // Always run query even if offline
   });
 
   const saveMutation = useMutation({
