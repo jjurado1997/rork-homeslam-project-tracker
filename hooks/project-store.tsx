@@ -449,9 +449,9 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     let filtered = projects;
     
     if (selectedFilter === 'active') {
-      filtered = filtered.filter(p => !p.isCompleted);
+      filtered = filtered.filter(p => !p.isCompleted || p.isCompleted === undefined);
     } else if (selectedFilter === 'completed') {
-      filtered = filtered.filter(p => p.isCompleted);
+      filtered = filtered.filter(p => p.isCompleted === true);
     }
 
     if (selectedClient !== 'all') {

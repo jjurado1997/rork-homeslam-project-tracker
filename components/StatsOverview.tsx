@@ -7,7 +7,7 @@ import { useProjects } from '@/hooks/project-store';
 export function StatsOverview() {
   const { allProjects, calculateStats } = useProjects();
 
-  const activeProjects = allProjects.filter(p => !p.isCompleted);
+  const activeProjects = allProjects.filter(p => !p.isCompleted || p.isCompleted === undefined);
 
   const totalStats = allProjects.reduce((acc, project) => {
     const stats = calculateStats(project);
