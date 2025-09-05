@@ -7,24 +7,41 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  TextInput,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '@/constants/theme';
-import { RefreshCw, Trash2, Database, AlertTriangle } from 'lucide-react-native';
+import { RefreshCw, Trash2, Database, AlertTriangle, Download, Upload, Copy } from 'lucide-react-native';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
+import { useProjects } from '@/hooks/project-store';
 
 interface DebugInfo {
   storageSize: string;
   projectCount: number;
   hasCorruptedData: boolean;
   lastError?: string;
+  rawData?: string;
+}
+
+interface BackupData {
+  version: string;
+  timestamp: string;
+  projects: any[];
 }
 
 export default function DebugScreen() {
   const router = useRouter();
+  const { allProjects } = useProjects();
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isClearing, setIsClearing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importDataText, setImportDataText] = useState('');
+  const [showImportInput, setShowImportInput] = useState(false);
 
   const loadDebugInfo = async () => {
     try {
@@ -39,6 +56,7 @@ export default function DebugScreen() {
 
       if (stored) {
         info.storageSize = `${Math.round(stored.length / 1024)} KB`;
+        info.rawData = stored;
         
         try {
           const projects = JSON.parse(stored);
@@ -92,6 +110,123 @@ export default function DebugScreen() {
         },
       ]
     );
+  };
+
+  const exportData = async () => {
+    try {
+      setIsExporting(true);
+      
+      const backupData: BackupData = {
+        version: '1.0',
+        timestamp: new Date().toISOString(),
+        projects: allProjects
+      };
+      
+      const jsonString = JSON.stringify(backupData, null, 2);
+      
+      if (Platform.OS === 'web') {
+        // Web: Copy to clipboard
+        if (navigator.clipboard) {
+          await navigator.clipboard.writeText(jsonString);
+          Alert.alert('Success', 'Backup data copied to clipboard! Save it somewhere safe.');
+        } else {
+          // Fallback for older browsers
+          const textArea = document.createElement('textarea');
+          textArea.value = jsonString;
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+          Alert.alert('Success', 'Backup data copied to clipboard! Save it somewhere safe.');
+        }
+      } else {
+        // Mobile: Save to file and share
+        const fileName = `homeslam_backup_${new Date().toISOString().split('T')[0]}.json`;
+        const fileUri = FileSystem.documentDirectory + fileName;
+        
+        await FileSystem.writeAsStringAsync(fileUri, jsonString);
+        
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(fileUri, {
+            mimeType: 'application/json',
+            dialogTitle: 'Save your HomeSlam backup'
+          });
+        } else {
+          Alert.alert('Success', `Backup saved to: ${fileUri}`);
+        }
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      Alert.alert('Error', `Failed to export data: ${error}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+  
+  const importData = async () => {
+    if (!importDataText.trim()) {
+      Alert.alert('Error', 'Please paste your backup data first.');
+      return;
+    }
+    
+    try {
+      setIsImporting(true);
+      
+      const parsed = JSON.parse(importDataText.trim());
+      
+      // Validate backup format
+      if (!parsed.projects || !Array.isArray(parsed.projects)) {
+        throw new Error('Invalid backup format: missing projects array');
+      }
+      
+      // Save the imported projects
+      await AsyncStorage.setItem('homeslam_projects', JSON.stringify(parsed.projects));
+      
+      Alert.alert(
+        'Success!', 
+        `Imported ${parsed.projects.length} projects successfully! The app will refresh now.`,
+        [{
+          text: 'OK',
+          onPress: () => {
+            setShowImportInput(false);
+            setImportDataText('');
+            loadDebugInfo();
+            // Force app to refresh by going home
+            router.replace('/(tabs)');
+          }
+        }]
+      );
+    } catch (error) {
+      console.error('Import error:', error);
+      Alert.alert('Error', `Failed to import data: ${error}`);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+  
+  const copyRawData = async () => {
+    if (!debugInfo?.rawData) {
+      Alert.alert('Error', 'No raw data available to copy.');
+      return;
+    }
+    
+    try {
+      if (Platform.OS === 'web') {
+        if (navigator.clipboard) {
+          await navigator.clipboard.writeText(debugInfo.rawData);
+        } else {
+          const textArea = document.createElement('textarea');
+          textArea.value = debugInfo.rawData;
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+        }
+      }
+      Alert.alert('Success', 'Raw data copied to clipboard!');
+    } catch (error) {
+      Alert.alert('Error', `Failed to copy data: ${error}`);
+    }
   };
 
   const goHome = () => {
@@ -173,6 +308,35 @@ export default function DebugScreen() {
         </TouchableOpacity>
         
         <TouchableOpacity 
+          style={styles.actionButton} 
+          onPress={exportData}
+          disabled={isExporting}
+        >
+          <Download size={20} color={theme.colors.secondary} />
+          <Text style={styles.actionButtonText}>
+            {isExporting ? 'Exporting...' : 'Export/Backup Data'}
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.actionButton} 
+          onPress={() => setShowImportInput(!showImportInput)}
+        >
+          <Upload size={20} color={theme.colors.secondary} />
+          <Text style={styles.actionButtonText}>Import/Restore Data</Text>
+        </TouchableOpacity>
+        
+        {debugInfo?.rawData && (
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={copyRawData}
+          >
+            <Copy size={20} color={theme.colors.secondary} />
+            <Text style={styles.actionButtonText}>Copy Raw Data</Text>
+          </TouchableOpacity>
+        )}
+        
+        <TouchableOpacity 
           style={[styles.actionButton, styles.dangerButton]} 
           onPress={clearStorage}
           disabled={isClearing}
@@ -191,16 +355,62 @@ export default function DebugScreen() {
         </TouchableOpacity>
       </View>
 
+      {showImportInput && (
+        <View style={styles.importContainer}>
+          <Text style={styles.sectionTitle}>Import Backup Data</Text>
+          <Text style={styles.instructionText}>
+            Paste your backup data below and tap &quot;Import Data&quot;:
+          </Text>
+          <TextInput
+            style={styles.importInput}
+            multiline
+            numberOfLines={6}
+            value={importDataText}
+            onChangeText={setImportDataText}
+            placeholder="Paste your backup JSON data here..."
+            placeholderTextColor={theme.colors.textLight}
+          />
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.successButton]} 
+            onPress={importData}
+            disabled={isImporting || !importDataText.trim()}
+          >
+            <Upload size={20} color={theme.colors.surface} />
+            <Text style={[styles.actionButtonText, styles.successButtonText]}>
+              {isImporting ? 'Importing...' : 'Import Data'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.instructionsContainer}>
-        <Text style={styles.sectionTitle}>Instructions</Text>
-        <Text style={styles.instructionText}>
-          1. If data is corrupted, try &quot;Clear All Data&quot; to reset the app
+        <Text style={styles.sectionTitle}>Data Recovery Instructions</Text>
+        <Text style={styles.warningText}>
+          ⚠️ IMPORTANT: This app stores data locally on each device. Data is NOT synced to the cloud.
         </Text>
         <Text style={styles.instructionText}>
-          2. After clearing data, tap &quot;Try App Again&quot; to return to the main app
+          <Text style={styles.boldText}>To recover your data:</Text>
         </Text>
         <Text style={styles.instructionText}>
-          3. If issues persist, restart the app completely
+          1. If you have a backup file, use &quot;Import/Restore Data&quot; above
+        </Text>
+        <Text style={styles.instructionText}>
+          2. If you&apos;re on a different device, your data won&apos;t be there
+        </Text>
+        <Text style={styles.instructionText}>
+          3. Check the original device where you entered the data
+        </Text>
+        <Text style={styles.instructionText}>
+          <Text style={styles.boldText}>To prevent future data loss:</Text>
+        </Text>
+        <Text style={styles.instructionText}>
+          1. Use &quot;Export/Backup Data&quot; regularly to save your projects
+        </Text>
+        <Text style={styles.instructionText}>
+          2. Save the backup file to cloud storage (Google Drive, iCloud, etc.)
+        </Text>
+        <Text style={styles.instructionText}>
+          3. Import the backup on any new device to restore your data
         </Text>
       </View>
     </ScrollView>
@@ -319,6 +529,12 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: theme.colors.surface,
   },
+  successButton: {
+    backgroundColor: theme.colors.success,
+  },
+  successButtonText: {
+    color: theme.colors.surface,
+  },
   instructionsContainer: {
     padding: 20,
   },
@@ -327,5 +543,38 @@ const styles = StyleSheet.create({
     color: theme.colors.textLight,
     marginBottom: 8,
     lineHeight: 20,
+  },
+  warningText: {
+    fontSize: 14,
+    color: theme.colors.warning,
+    marginBottom: 12,
+    lineHeight: 20,
+    fontWeight: '600' as const,
+    backgroundColor: theme.colors.warning + '10',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.warning + '30',
+  },
+  boldText: {
+    fontWeight: '600' as const,
+    color: theme.colors.text,
+  },
+  importContainer: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  importInput: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    color: theme.colors.text,
+    backgroundColor: theme.colors.surface,
+    marginBottom: 16,
+    minHeight: 120,
+    textAlignVertical: 'top',
   },
 });
