@@ -46,7 +46,33 @@ export default function DebugScreen() {
   const loadDebugInfo = async () => {
     try {
       setIsLoading(true);
-      const stored = await AsyncStorage.getItem('homeslam_projects');
+      console.log('🔍 Debug: Checking AsyncStorage for data...');
+      
+      // Check all possible storage keys that might have been used
+      const possibleKeys = [
+        'homeslam_projects',
+        'projects', 
+        'HomeSlam_projects',
+        'homeslam_data',
+        'app_data'
+      ];
+      
+      let foundData = null;
+      let foundKey = null;
+      
+      for (const key of possibleKeys) {
+        const data = await AsyncStorage.getItem(key);
+        if (data) {
+          console.log(`🎯 Found data in key: ${key}`);
+          foundData = data;
+          foundKey = key;
+          break;
+        }
+      }
+      
+      // Also check all keys in AsyncStorage
+      const allKeys = await AsyncStorage.getAllKeys();
+      console.log('📋 All AsyncStorage keys:', allKeys);
       
       let info: DebugInfo = {
         storageSize: '0 KB',
@@ -54,14 +80,25 @@ export default function DebugScreen() {
         hasCorruptedData: false,
       };
 
-      if (stored) {
-        info.storageSize = `${Math.round(stored.length / 1024)} KB`;
-        info.rawData = stored;
+      if (foundData) {
+        console.log(`📦 Found data in ${foundKey}, size: ${foundData.length} chars`);
+        info.storageSize = `${Math.round(foundData.length / 1024)} KB`;
+        info.rawData = foundData;
+        info.lastError = foundKey !== 'homeslam_projects' ? `Data found in different key: ${foundKey}` : undefined;
         
         try {
-          const projects = JSON.parse(stored);
+          const projects = JSON.parse(foundData);
           if (Array.isArray(projects)) {
             info.projectCount = projects.length;
+            console.log(`✅ Found ${projects.length} projects in ${foundKey}`);
+            
+            // If data is in wrong key, migrate it
+            if (foundKey !== 'homeslam_projects' && foundKey) {
+              console.log(`🔄 Migrating data from ${foundKey} to homeslam_projects`);
+              await AsyncStorage.setItem('homeslam_projects', foundData);
+              await AsyncStorage.removeItem(foundKey);
+              info.lastError = `Data migrated from ${foundKey} to correct location`;
+            }
           } else {
             info.hasCorruptedData = true;
             info.lastError = 'Data is not an array';
@@ -70,6 +107,9 @@ export default function DebugScreen() {
           info.hasCorruptedData = true;
           info.lastError = `Parse error: ${parseError}`;
         }
+      } else {
+        console.log('❌ No project data found in any storage key');
+        info.lastError = `No data found. Checked keys: ${possibleKeys.join(', ')}. All keys: ${allKeys.join(', ')}`;
       }
 
       setDebugInfo(info);
