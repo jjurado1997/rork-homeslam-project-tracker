@@ -17,6 +17,7 @@ import { RefreshCw, Trash2, Database, AlertTriangle, Download, Upload, Copy } fr
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import { useProjects } from '@/hooks/project-store';
+import { migrateDataToBackend } from '@/utils/dataMigration';
 
 interface DebugInfo {
   storageSize: string;
@@ -42,6 +43,7 @@ export default function DebugScreen() {
   const [isImporting, setIsImporting] = useState(false);
   const [importDataText, setImportDataText] = useState('');
   const [showImportInput, setShowImportInput] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
 
   const loadDebugInfo = async () => {
     try {
@@ -577,6 +579,65 @@ export default function DebugScreen() {
         </TouchableOpacity>
         
         <TouchableOpacity 
+          style={[styles.actionButton, styles.migrateButton]} 
+          onPress={async () => {
+            Alert.alert(
+              'Migrate to Backend',
+              'This will move your local data to the secure backend server. Your data will be safer and never lost again. This is recommended!',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Migrate Now',
+                  onPress: async () => {
+                    try {
+                      setIsMigrating(true);
+                      const result = await migrateDataToBackend();
+                      
+                      if (result.success) {
+                        if (result.migratedCount > 0) {
+                          Alert.alert(
+                            'Migration Successful! 🎉',
+                            `Successfully migrated ${result.migratedCount} projects to the backend. Your data is now safe and will never be lost!`,
+                            [{
+                              text: 'Great!',
+                              onPress: () => {
+                                router.replace('/(tabs)');
+                              }
+                            }]
+                          );
+                        } else {
+                          Alert.alert(
+                            'Migration Complete',
+                            result.error || 'No data needed to be migrated.',
+                            [{ text: 'OK' }]
+                          );
+                        }
+                      } else {
+                        Alert.alert(
+                          'Migration Failed',
+                          `Failed to migrate data: ${result.error}`,
+                          [{ text: 'OK' }]
+                        );
+                      }
+                    } catch (error) {
+                      Alert.alert('Error', `Migration error: ${error}`);
+                    } finally {
+                      setIsMigrating(false);
+                    }
+                  }
+                }
+              ]
+            );
+          }}
+          disabled={isMigrating}
+        >
+          <Upload size={20} color={theme.colors.success} />
+          <Text style={[styles.actionButtonText, { color: theme.colors.success }]}>
+            {isMigrating ? 'Migrating...' : 'Migrate to Backend (Recommended)'}
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
           style={[styles.actionButton, styles.sampleButton]} 
           onPress={createSampleData}
         >
@@ -812,6 +873,11 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.secondary,
     borderWidth: 2,
     borderColor: theme.colors.primary,
+  },
+  migrateButton: {
+    backgroundColor: theme.colors.success + '20',
+    borderWidth: 2,
+    borderColor: theme.colors.success,
   },
   instructionsContainer: {
     padding: 20,
