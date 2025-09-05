@@ -530,6 +530,13 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     }
   }, [isOnline, localProjects, queryClient]);
 
+  // Clear all data function
+  const clearAllData = useCallback(async () => {
+    await AsyncStorage.removeItem('homeslam_projects');
+    setLocalProjects([]);
+    console.log('🧹 Local data cleared');
+  }, []);
+
   return useMemo(() => ({
     projects: filteredProjects,
     allProjects: projects,
@@ -556,11 +563,7 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     reopenProject,
     calculateStats,
     syncToBackend,
-    clearAllData: useCallback(async () => {
-      await AsyncStorage.removeItem('homeslam_projects');
-      setLocalProjects([]);
-      console.log('🧹 Local data cleared');
-    }, []),
+    clearAllData,
   }), [
     filteredProjects,
     projects,
@@ -586,6 +589,7 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     completeProject,
     reopenProject,
     calculateStats,
-    syncToBackend
+    syncToBackend,
+    clearAllData
   ]);
 });
