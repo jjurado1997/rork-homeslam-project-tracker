@@ -313,6 +313,121 @@ export default function DebugScreen() {
     }
   };
 
+  const createSampleData = async () => {
+    Alert.alert(
+      'Create Sample Data',
+      'This will create 3 sample projects to help you get started. You can modify or delete them later.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Create Sample Data',
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+              
+              const sampleProjects = [
+                {
+                  id: '1',
+                  name: 'Kitchen Renovation',
+                  client: 'Johnson Family',
+                  totalRevenue: 25000,
+                  expenses: [
+                    {
+                      id: '1',
+                      description: 'Cabinets',
+                      amount: 8000,
+                      date: new Date().toISOString(),
+                      category: 'Materials'
+                    },
+                    {
+                      id: '2',
+                      description: 'Labor - Installation',
+                      amount: 3500,
+                      date: new Date().toISOString(),
+                      category: 'Labor'
+                    }
+                  ],
+                  changeOrders: [],
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                },
+                {
+                  id: '2',
+                  name: 'Bathroom Remodel',
+                  client: 'Smith Residence',
+                  totalRevenue: 18000,
+                  expenses: [
+                    {
+                      id: '3',
+                      description: 'Tiles and Fixtures',
+                      amount: 4500,
+                      date: new Date().toISOString(),
+                      category: 'Materials'
+                    }
+                  ],
+                  changeOrders: [
+                    {
+                      id: '1',
+                      description: 'Additional lighting fixtures',
+                      amount: 1200,
+                      date: new Date().toISOString(),
+                      approved: true
+                    }
+                  ],
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                },
+                {
+                  id: '3',
+                  name: 'Deck Construction',
+                  client: 'Williams Property',
+                  totalRevenue: 12000,
+                  expenses: [
+                    {
+                      id: '4',
+                      description: 'Lumber and Hardware',
+                      amount: 3200,
+                      date: new Date().toISOString(),
+                      category: 'Materials'
+                    },
+                    {
+                      id: '5',
+                      description: 'Equipment Rental',
+                      amount: 800,
+                      date: new Date().toISOString(),
+                      category: 'Equipment'
+                    }
+                  ],
+                  changeOrders: [],
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                }
+              ];
+              
+              await AsyncStorage.setItem('homeslam_projects', JSON.stringify(sampleProjects));
+              
+              Alert.alert(
+                'Sample Data Created!',
+                'Created 3 sample projects with expenses and change orders. You can now use the app normally.',
+                [{
+                  text: 'OK',
+                  onPress: () => {
+                    loadDebugInfo();
+                    router.replace('/(tabs)');
+                  }
+                }]
+              );
+            } catch (error) {
+              Alert.alert('Error', `Failed to create sample data: ${error}`);
+            } finally {
+              setIsLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const goHome = () => {
     router.replace('/(tabs)');
   };
@@ -458,6 +573,16 @@ export default function DebugScreen() {
           <RefreshCw size={20} color={theme.colors.success} />
           <Text style={[styles.actionButtonText, { color: theme.colors.success }]}>
             Auto-Recover Data
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.sampleButton]} 
+          onPress={createSampleData}
+        >
+          <Database size={20} color={theme.colors.primary} />
+          <Text style={[styles.actionButtonText, { color: theme.colors.primary }]}>
+            Create Sample Data
           </Text>
         </TouchableOpacity>
         
@@ -682,6 +807,11 @@ const styles = StyleSheet.create({
   },
   successButtonText: {
     color: theme.colors.surface,
+  },
+  sampleButton: {
+    backgroundColor: theme.colors.secondary,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
   },
   instructionsContainer: {
     padding: 20,
