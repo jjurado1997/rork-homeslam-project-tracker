@@ -7,36 +7,12 @@ import { createContext } from "./trpc/create-context";
 // Create the backend app that will be mounted at /api
 const app = new Hono();
 
-// Add CORS headers for all requests
-app.use('*', async (c, next) => {
-  // Set CORS headers
-  c.header('Access-Control-Allow-Origin', '*');
-  c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
-  c.header('Access-Control-Max-Age', '86400');
-  
-  // Handle preflight requests
-  if (c.req.method === 'OPTIONS') {
-    return new Response('', { status: 204 });
-  }
-  
-  await next();
-});
-
-// Add debug logging for all requests
-app.use("*", async (c, next) => {
-  console.log(`🔍 Request: ${c.req.method} ${c.req.url}`);
-  console.log(`🔍 Headers:`, Object.fromEntries(c.req.raw.headers.entries()));
-  await next();
-  console.log(`🔍 Response status: ${c.res.status}`);
-});
-
-// Enable CORS for all routes with proper configuration
+// Enable CORS for all routes first
 app.use("*", cors({
-  origin: '*', // Allow all origins in development
+  origin: '*',
   credentials: true,
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization'],
+  allowHeaders: ['Content-Type', 'Authorization', 'Accept'],
 }));
 
 // Add request logging middleware

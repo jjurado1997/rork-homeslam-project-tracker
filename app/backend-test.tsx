@@ -80,7 +80,7 @@ export default function BackendTestScreen() {
     
     try {
       const baseUrl = getBaseUrl();
-      const trpcUrl = `${baseUrl}/api/trpc/projects.getAll`;
+      const trpcUrl = `${baseUrl}/api/trpc/projects.getAll?input=%7B%22json%22%3Anull%7D`;
       addResult(`Base URL detected: ${baseUrl}`);
       
       addResult(`Fetching: ${trpcUrl}`);
@@ -101,8 +101,8 @@ export default function BackendTestScreen() {
       
       if (response.ok) {
         try {
-          JSON.parse(text);
-          addResult(`✅ tRPC endpoint successful`);
+          const parsed = JSON.parse(text);
+          addResult(`✅ tRPC endpoint successful: ${JSON.stringify(parsed).substring(0, 100)}`);
         } catch {
           addResult(`⚠️ tRPC endpoint returned non-JSON: ${text}`);
         }
@@ -123,10 +123,16 @@ export default function BackendTestScreen() {
     try {
       // Import vanilla tRPC client for direct calls
       const { vanillaTrpcClient } = await import('@/lib/trpc');
+      addResult('tRPC client imported successfully');
+      
       const result = await vanillaTrpcClient.example.hi.query();
       addResult(`✅ tRPC client successful: ${JSON.stringify(result)}`);
     } catch (error: any) {
       addResult(`❌ tRPC client error: ${error?.message || error}`);
+      if (error?.message?.includes('HTML instead of JSON')) {
+        addResult('This suggests the backend server is not properly configured');
+        addResult('The server is returning HTML (likely a 404 page) instead of JSON');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -138,11 +144,19 @@ export default function BackendTestScreen() {
     
     try {
       const { vanillaTrpcClient } = await import('@/lib/trpc');
+      addResult('Attempting to query projects...');
+      
       const result = await vanillaTrpcClient.projects.getAll.query();
       addResult(`✅ Projects query successful: ${Array.isArray(result) ? result.length : 'unknown'} projects`);
       addResult(`Projects data: ${JSON.stringify(result).substring(0, 100)}...`);
     } catch (error: any) {
       addResult(`❌ Projects query error: ${error?.message || error}`);
+      if (error?.message?.includes('HTML instead of JSON')) {
+        addResult('Backend is returning HTML instead of JSON - this means:');
+        addResult('1. The tRPC routes are not properly mounted');
+        addResult('2. The server configuration is incorrect');
+        addResult('3. The URL path is wrong');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -152,6 +166,7 @@ export default function BackendTestScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
         <Text style={styles.title}>Backend Connection Test</Text>
+        <Text style={styles.subtitle}>Run these tests in order to diagnose backend issues</Text>
         
         <View style={styles.buttonContainer}>
           <TouchableOpacity 
@@ -159,7 +174,7 @@ export default function BackendTestScreen() {
             onPress={testHealthEndpoint}
             disabled={isLoading}
           >
-            <Text style={styles.buttonText}>Test Health Endpoint</Text>
+            <Text style={styles.buttonText}>1. Test Health Endpoint</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -167,7 +182,7 @@ export default function BackendTestScreen() {
             onPress={testTrpcEndpoint}
             disabled={isLoading}
           >
-            <Text style={styles.buttonText}>Test tRPC Endpoint</Text>
+            <Text style={styles.buttonText}>2. Test tRPC Endpoint</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -175,7 +190,7 @@ export default function BackendTestScreen() {
             onPress={testTrpcClient}
             disabled={isLoading}
           >
-            <Text style={styles.buttonText}>Test tRPC Client</Text>
+            <Text style={styles.buttonText}>3. Test tRPC Client</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -183,7 +198,27 @@ export default function BackendTestScreen() {
             onPress={testProjectsQuery}
             disabled={isLoading}
           >
-            <Text style={styles.buttonText}>Test Projects Query</Text>
+            <Text style={styles.buttonText}>4. Test Projects Query</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.button, isLoading && styles.buttonDisabled]} 
+            onPress={async () => {
+              setIsLoading(true);
+              addResult('Running all tests in sequence...');
+              await testHealthEndpoint();
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              await testTrpcEndpoint();
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              await testTrpcClient();
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              await testProjectsQuery();
+              addResult('All tests completed!');
+              setIsLoading(false);
+            }}
+            disabled={isLoading}
+          >
+            <Text style={styles.buttonText}>🚀 Run All Tests</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -218,6 +253,12 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold' as const,
     color: theme.colors.text,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: theme.colors.textLight,
     marginBottom: 24,
     textAlign: 'center',
   },

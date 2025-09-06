@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { trpcClient } from '@/lib/trpc';
+import { vanillaTrpcClient } from '@/lib/trpc';
 import { Project } from '@/types/project';
 
 const STORAGE_KEY = 'homeslam_projects';
@@ -34,7 +34,7 @@ export const migrateDataToBackend = async (): Promise<{ success: boolean; migrat
     console.log(`📦 Found ${localProjects.length} projects to migrate`);
 
     // Check if backend already has data
-    const backendProjects = await trpcClient.projects.getAll.query();
+    const backendProjects = await vanillaTrpcClient.projects.getAll.query();
     if (backendProjects.length > 0) {
       console.log(`⚠️ Backend already has ${backendProjects.length} projects. Skipping migration to avoid duplicates.`);
       return { success: true, migratedCount: 0, error: 'Backend already has data' };
@@ -47,7 +47,7 @@ export const migrateDataToBackend = async (): Promise<{ success: boolean; migrat
         console.log(`🚀 Migrating project: ${project.name}`);
         
         // Create the project in backend
-        const createdProject = await trpcClient.projects.create.mutate({
+        const createdProject = await vanillaTrpcClient.projects.create.mutate({
           name: project.name,
           address: project.address || '',
           client: project.client,
@@ -58,7 +58,7 @@ export const migrateDataToBackend = async (): Promise<{ success: boolean; migrat
 
         // Migrate expenses
         for (const expense of project.expenses || []) {
-          await trpcClient.expenses.create.mutate({
+          await vanillaTrpcClient.expenses.create.mutate({
             projectId: createdProject.id,
             category: expense.category,
             subcategory: expense.subcategory,
@@ -69,7 +69,7 @@ export const migrateDataToBackend = async (): Promise<{ success: boolean; migrat
 
         // Migrate change orders
         for (const changeOrder of project.changeOrders || []) {
-          await trpcClient.changeOrders.create.mutate({
+          await vanillaTrpcClient.changeOrders.create.mutate({
             projectId: createdProject.id,
             description: changeOrder.description,
             amount: changeOrder.amount,
@@ -79,7 +79,7 @@ export const migrateDataToBackend = async (): Promise<{ success: boolean; migrat
 
         // Update project completion status if needed
         if (project.isCompleted) {
-          await trpcClient.projects.update.mutate({
+          await vanillaTrpcClient.projects.update.mutate({
             id: createdProject.id,
             updates: {
               isCompleted: true,

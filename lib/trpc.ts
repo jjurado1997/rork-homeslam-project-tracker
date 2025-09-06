@@ -18,21 +18,12 @@ const getBaseUrl = () => {
     process.env.EXPO_PUBLIC_API_URL,
     process.env.EXPO_PUBLIC_DEV_SERVER_URL,
     process.env.EXPO_DEV_SERVER_URL,
-    // Try to construct from the manifest URL if available
-    typeof global !== 'undefined' && (global as any).__DEV__ && (global as any).location?.origin,
   ].filter(Boolean);
   
   if (possibleUrls.length > 0) {
     const url = possibleUrls[0];
     console.log('📱 Mobile environment detected, using:', url);
     return url;
-  }
-  
-  // For Rork platform - try to detect the current server URL
-  if (typeof global !== 'undefined' && (global as any).location) {
-    const rorkUrl = (global as any).location.origin;
-    console.log('🚀 Rork platform detected, using:', rorkUrl);
-    return rorkUrl;
   }
   
   // Final fallback - localhost
