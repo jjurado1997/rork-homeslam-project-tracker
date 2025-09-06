@@ -9,7 +9,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 export const [ProjectProvider, useProjects] = createContextHook(() => {
-  try {
   const queryClient = useQueryClient();
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'active' | 'completed'>('active');
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly'>('monthly');
@@ -689,36 +688,4 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     syncToBackend,
     clearAllData
   ]);
-  } catch (error) {
-    console.error('❌ Critical error in ProjectProvider:', error);
-    // Return a safe fallback state
-    return {
-      projects: [],
-      allProjects: [],
-      isLoading: false,
-      error: null,
-      isOnline: false,
-      lastSyncTime: null,
-      selectedFilter: 'active' as const,
-      setSelectedFilter: () => {},
-      selectedPeriod: 'monthly' as const,
-      setSelectedPeriod: () => {},
-      selectedClient: 'all',
-      setSelectedClient: () => {},
-      addProject: () => {},
-      updateProject: () => {},
-      deleteProject: () => {},
-      addExpense: () => {},
-      updateExpense: () => {},
-      deleteExpense: () => {},
-      addChangeOrder: () => {},
-      updateChangeOrder: () => {},
-      deleteChangeOrder: () => {},
-      completeProject: () => {},
-      reopenProject: () => {},
-      calculateStats: () => ({ totalRevenue: 0, totalChangeOrders: 0, totalExpenses: 0, profit: 0, profitMargin: 0, laborPercentage: 0 }),
-      syncToBackend: async () => ({ success: false, message: 'Provider error' }),
-      clearAllData: async () => {},
-    };
-  }
 });

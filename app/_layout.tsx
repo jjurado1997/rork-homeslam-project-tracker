@@ -36,15 +36,16 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
     if (this.state.hasError) {
       return (
         <View style={errorStyles.container}>
-          <Text style={errorStyles.title}>App Crashed</Text>
+          <Text style={errorStyles.title}>Something went wrong</Text>
           <Text style={errorStyles.message}>
-            {this.state.error?.message || 'An unexpected error occurred'}
+            The app encountered an error. Try clearing the data to fix it.
           </Text>
           <TouchableOpacity 
             style={errorStyles.button}
             onPress={async () => {
               try {
                 await AsyncStorage.removeItem('homeslam_projects');
+                await AsyncStorage.removeItem('homeslam_projects_backup');
                 console.log('✅ Storage cleared successfully');
                 this.setState({ hasError: false, error: undefined });
               } catch (clearError) {
@@ -56,9 +57,17 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
           >
             <Text style={errorStyles.buttonText}>Clear Data & Restart</Text>
           </TouchableOpacity>
+          <TouchableOpacity 
+            style={[errorStyles.button, { backgroundColor: theme.colors.secondary }]}
+            onPress={() => {
+              this.setState({ hasError: false, error: undefined });
+            }}
+          >
+            <Text style={errorStyles.buttonText}>Try Again</Text>
+          </TouchableOpacity>
           {__DEV__ && (
             <Text style={errorStyles.debugText}>
-              {this.state.error?.stack}
+              Error: {this.state.error?.message}
             </Text>
           )}
         </View>
