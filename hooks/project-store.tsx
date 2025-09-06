@@ -95,9 +95,19 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
   const projectsQuery = trpc.projects.getAll.useQuery(undefined, {
     retry: (failureCount: number, error: any) => {
       console.log(`🔄 Backend query retry attempt ${failureCount}:`, error?.message || 'Unknown error');
-      if (failureCount >= 1) { // Reduce retries to fail faster
+      
+      // Check for specific backend unavailable errors
+      const errorMessage = error?.message || '';
+      const isBackendUnavailable = 
+        errorMessage.includes('HTML instead of JSON') ||
+        errorMessage.includes('Backend API not found') ||
+        errorMessage.includes('Network error') ||
+        errorMessage.includes('fetch');
+      
+      if (failureCount >= 1 || isBackendUnavailable) {
         console.log('🔌 Backend unavailable after retries, switching to offline mode');
         setIsOnline(false);
+        return false; // Don't retry
       }
       return failureCount < 1; // Only retry once before giving up
     },

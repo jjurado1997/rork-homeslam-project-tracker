@@ -1,17 +1,7 @@
-import { z } from "zod";
-import { publicProcedure, createTRPCRouter } from "../../../create-context";
+import { publicProcedure } from "../../../create-context";
 
-const hiMutation = publicProcedure
-  .input(z.object({ name: z.string() }))
-  .mutation(({ input }) => {
-    console.log('👋 Hi mutation called with:', input.name);
-    return {
-      hello: input.name,
-      date: new Date(),
-    };
-  });
-
-const hiQuery = publicProcedure
+// Export a simple query procedure directly
+export default publicProcedure
   .query(() => {
     console.log('👋 Hi query called');
     return {
@@ -20,8 +10,3 @@ const hiQuery = publicProcedure
       status: 'Backend is working'
     };
   });
-
-export default createTRPCRouter({
-  query: hiQuery,
-  mutate: hiMutation,
-});

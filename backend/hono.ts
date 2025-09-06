@@ -7,6 +7,14 @@ import { createContext } from "./trpc/create-context";
 // Create the backend app that will be mounted at /api
 const app = new Hono();
 
+// Add debug logging for all requests
+app.use("*", async (c, next) => {
+  console.log(`🔍 Request: ${c.req.method} ${c.req.url}`);
+  console.log(`🔍 Headers:`, Object.fromEntries(c.req.raw.headers.entries()));
+  await next();
+  console.log(`🔍 Response status: ${c.res.status}`);
+});
+
 // Enable CORS for all routes with proper configuration
 app.use("*", cors({
   origin: '*', // Allow all origins in development

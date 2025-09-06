@@ -159,6 +159,7 @@ export const vanillaTrpcClient = createTRPCProxyClient<AppRouter>({
     httpBatchLink({
       url: trpcUrl,
       transformer: superjson,
+      fetch: customFetch,
       headers: () => ({
         'Content-Type': 'application/json',
         'Accept': 'application/json',

@@ -28,6 +28,13 @@ export default function ProjectsScreen() {
     allProjectsCount: allProjects.length,
     projectNames: projects.map(p => p.name)
   });
+  
+  // Force offline mode if we have local data but backend is failing
+  React.useEffect(() => {
+    if (!isOnline && allProjects.length > 0) {
+      console.log('📱 Using local data:', allProjects.length, 'projects');
+    }
+  }, [isOnline, allProjects.length]);
 
   const handleAddProject = () => {
     router.push('/add-project');
