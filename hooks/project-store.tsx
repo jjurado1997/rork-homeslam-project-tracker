@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Project, Expense, ProjectStats, ChangeOrder } from '@/types/project';
 import { trpc } from '@/lib/trpc';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
+
 
 
 
@@ -94,6 +94,11 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     },
     onError: (error) => {
       console.error('❌ Create project error:', error);
+      // If backend is unavailable, switch to offline mode
+      if (error.message.includes('JSON Parse error') || error.message.includes('fetch')) {
+        console.log('🔌 Backend unavailable during create, switching to offline mode');
+        setIsOnline(false);
+      }
     }
   });
 
