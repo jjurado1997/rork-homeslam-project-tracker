@@ -12,10 +12,7 @@ const updateProjectSchema = z.object({
     projectStartDate: z.string().transform(str => new Date(str)).optional(),
     notes: z.string().optional(),
     isCompleted: z.boolean().optional(),
-    completedAt: z.union([
-      z.string().transform(str => new Date(str)), 
-      z.null()
-    ]).optional().transform(val => val === null ? undefined : val)
+    completedAt: z.string().transform(str => new Date(str)).optional()
   })
 });
 

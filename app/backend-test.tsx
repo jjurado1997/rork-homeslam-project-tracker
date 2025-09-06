@@ -15,15 +15,32 @@ export default function BackendTestScreen() {
     setTestResults([]);
   };
 
+  const getBaseUrl = () => {
+    if (typeof window !== 'undefined') {
+      return window.location.origin;
+    }
+    
+    const possibleUrls = [
+      process.env.EXPO_PUBLIC_API_URL,
+      process.env.EXPO_PUBLIC_DEV_SERVER_URL,
+      process.env.EXPO_DEV_SERVER_URL,
+    ].filter(Boolean);
+    
+    if (possibleUrls.length > 0) {
+      return possibleUrls[0];
+    }
+    
+    return 'http://localhost:8081';
+  };
+
   const testHealthEndpoint = async () => {
     setIsLoading(true);
     addResult('Testing health endpoint...');
     
     try {
-      const baseUrl = typeof window !== 'undefined' 
-        ? window.location.origin 
-        : 'https://xz3my09z8fnhklvcpdab9.rork.com';
+      const baseUrl = getBaseUrl();
       const healthUrl = `${baseUrl}/api`;
+      addResult(`Base URL detected: ${baseUrl}`);
       
       addResult(`Fetching: ${healthUrl}`);
       
@@ -62,10 +79,9 @@ export default function BackendTestScreen() {
     addResult('Testing tRPC endpoint...');
     
     try {
-      const baseUrl = typeof window !== 'undefined' 
-        ? window.location.origin 
-        : 'https://xz3my09z8fnhklvcpdab9.rork.com';
+      const baseUrl = getBaseUrl();
       const trpcUrl = `${baseUrl}/api/trpc/projects.getAll`;
+      addResult(`Base URL detected: ${baseUrl}`);
       
       addResult(`Fetching: ${trpcUrl}`);
       
