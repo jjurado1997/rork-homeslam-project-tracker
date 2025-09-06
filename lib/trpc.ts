@@ -40,7 +40,7 @@ export const trpcClient = trpc.createClient({
         console.log('📡 tRPC request:', { url, method: options?.method });
         
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
         
         try {
           const response = await fetch(url, {
@@ -48,6 +48,7 @@ export const trpcClient = trpc.createClient({
             signal: controller.signal,
             headers: {
               'Content-Type': 'application/json',
+              'Accept': 'application/json',
               ...options?.headers,
             },
           });
@@ -57,15 +58,33 @@ export const trpcClient = trpc.createClient({
           console.log('📡 tRPC response:', { 
             status: response.status, 
             statusText: response.statusText,
-            contentType: response.headers.get('content-type')
+            contentType: response.headers.get('content-type'),
+            url: response.url
           });
           
+          // Check if we got an HTML response (likely a 404 or server error page)
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType.includes('text/html')) {
+            const htmlText = await response.text();
+            console.error('❌ Received HTML instead of JSON:', {
+              status: response.status,
+              url: response.url,
+              contentType,
+              htmlPreview: htmlText.substring(0, 200)
+            });
+            
+            if (response.status === 404) {
+              throw new Error('Backend API not found - server may not be running');
+            } else {
+              throw new Error(`Server returned HTML instead of JSON (${response.status})`);
+            }
+          }
+          
           if (!response.ok) {
-            const contentType = response.headers.get('content-type');
             let errorText = 'Unknown error';
             
             try {
-              if (contentType?.includes('application/json')) {
+              if (contentType.includes('application/json')) {
                 const errorData = await response.json();
                 errorText = errorData.message || JSON.stringify(errorData);
               } else {
@@ -81,10 +100,12 @@ export const trpcClient = trpc.createClient({
           }
           
           // Validate response is JSON
-          const contentType = response.headers.get('content-type');
-          if (!contentType?.includes('application/json')) {
+          if (!contentType.includes('application/json')) {
             const text = await response.text();
-            console.error('❌ tRPC received non-JSON response:', text.substring(0, 200));
+            console.error('❌ tRPC received non-JSON response:', {
+              contentType,
+              textPreview: text.substring(0, 200)
+            });
             throw new Error('Server returned non-JSON response');
           }
           
@@ -95,6 +116,12 @@ export const trpcClient = trpc.createClient({
           if (error instanceof Error && error.name === 'AbortError') {
             console.error('❌ tRPC request timeout');
             throw new Error('Request timeout - server may be unavailable');
+          }
+          
+          // Network errors
+          if (error instanceof TypeError && error.message.includes('fetch')) {
+            console.error('❌ Network error - backend may be down:', error.message);
+            throw new Error('Network error - cannot reach backend server');
           }
           
           console.error('❌ tRPC fetch error:', error);

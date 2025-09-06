@@ -1,9 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { Trash2, Download, Upload, Info, Shield, Bell } from 'lucide-react-native';
+import { Trash2, Download, Upload, Info, Shield, Bell, Bug } from 'lucide-react-native';
 import { theme } from '@/constants/theme';
 import { useProjects } from '@/hooks/project-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 
 export default function SettingsScreen() {
   const { allProjects } = useProjects();
@@ -34,6 +35,10 @@ export default function SettingsScreen() {
     Alert.alert('Import Data', 'Import functionality will be available in a future update.');
   };
 
+  const handleDebugBackend = () => {
+    router.push('/backend-test');
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.section}>
@@ -52,6 +57,14 @@ export default function SettingsScreen() {
           <View style={styles.settingContent}>
             <Text style={styles.settingLabel}>Import Data</Text>
             <Text style={styles.settingDescription}>Restore from backup</Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.settingItem} onPress={handleDebugBackend}>
+          <Bug size={20} color={theme.colors.primary} />
+          <View style={styles.settingContent}>
+            <Text style={styles.settingLabel}>Backend Test</Text>
+            <Text style={styles.settingDescription}>Test backend connection and debug issues</Text>
           </View>
         </TouchableOpacity>
 

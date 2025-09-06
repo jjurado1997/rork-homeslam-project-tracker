@@ -59,6 +59,17 @@ app.get("/", (c) => {
   });
 });
 
+// Test endpoint to verify backend is working
+app.get("/test", (c) => {
+  console.log('🧪 Test endpoint requested');
+  return c.json({ 
+    message: "Backend is working!",
+    timestamp: new Date().toISOString(),
+    method: c.req.method,
+    url: c.req.url
+  });
+});
+
 // Catch-all route for debugging
 app.all("*", (c) => {
   console.log(`🔍 Unhandled route: ${c.req.method} ${c.req.url}`);

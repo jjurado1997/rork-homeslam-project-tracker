@@ -42,7 +42,7 @@ export default function BackendTestScreen() {
         try {
           const data = JSON.parse(text);
           addResult(`✅ Health check successful: ${data.message}`);
-        } catch (parseError) {
+        } catch {
           addResult(`⚠️ Health endpoint returned non-JSON: ${text}`);
         }
       } else {
@@ -81,9 +81,9 @@ export default function BackendTestScreen() {
       
       if (response.ok) {
         try {
-          const data = JSON.parse(text);
+          JSON.parse(text);
           addResult(`✅ tRPC endpoint successful`);
-        } catch (parseError) {
+        } catch {
           addResult(`⚠️ tRPC endpoint returned non-JSON: ${text}`);
         }
       } else {
@@ -103,7 +103,7 @@ export default function BackendTestScreen() {
     try {
       // Import trpcClient for direct calls
       const { trpcClient } = await import('@/lib/trpc');
-      const result = await trpcClient.example.hi.mutate({ name: 'Test User' });
+      const result = await trpcClient.example.hi.query.query();
       addResult(`✅ tRPC client successful: ${JSON.stringify(result)}`);
     } catch (error: any) {
       addResult(`❌ tRPC client error: ${error?.message || error}`);
