@@ -14,7 +14,8 @@ const updateProjectSchema = z.object({
     isCompleted: z.boolean().optional(),
     completedAt: z.union([
       z.string().transform(str => new Date(str)), 
-      z.null()
+      z.null(),
+      z.undefined()
     ]).optional().transform(val => val === null ? undefined : val)
   })
 });

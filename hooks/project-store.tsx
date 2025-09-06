@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 export const [ProjectProvider, useProjects] = createContextHook(() => {
+  try {
   const queryClient = useQueryClient();
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'active' | 'completed'>('active');
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly'>('monthly');
@@ -93,7 +94,7 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
 
   // Use tRPC to get projects from backend with robust fallback
   const projectsQuery = trpc.projects.getAll.useQuery(undefined, {
-    retry: (failureCount, error) => {
+    retry: (failureCount: number, error: any) => {
       console.log(`🔄 Backend query retry attempt ${failureCount}:`, error?.message || 'Unknown error');
       if (failureCount >= 2) {
         console.log('🔌 Backend unavailable after retries, switching to offline mode');
@@ -101,7 +102,7 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
       }
       return failureCount < 2; // Retry twice before giving up
     },
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff
+    retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
@@ -151,10 +152,10 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
       console.log('✅ Project created successfully');
       queryClient.invalidateQueries({ queryKey: [['projects', 'getAll']] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('❌ Create project error:', error);
       // If backend is unavailable, switch to offline mode
-      if (error.message.includes('JSON Parse error') || error.message.includes('fetch')) {
+      if (error?.message?.includes('JSON Parse error') || error?.message?.includes('fetch')) {
         console.log('🔌 Backend unavailable during create, switching to offline mode');
         setIsOnline(false);
       }
@@ -166,7 +167,7 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
       console.log('✅ Project updated successfully');
       queryClient.invalidateQueries({ queryKey: [['projects', 'getAll']] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('❌ Update project error:', error);
     }
   });
@@ -176,7 +177,7 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
       console.log('✅ Project deleted successfully');
       queryClient.invalidateQueries({ queryKey: [['projects', 'getAll']] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('❌ Delete project error:', error);
     }
   });
@@ -186,7 +187,7 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
       console.log('✅ Expense created successfully');
       queryClient.invalidateQueries({ queryKey: [['projects', 'getAll']] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('❌ Create expense error:', error);
     }
   });
@@ -196,7 +197,7 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
       console.log('✅ Expense updated successfully');
       queryClient.invalidateQueries({ queryKey: [['projects', 'getAll']] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('❌ Update expense error:', error);
     }
   });
@@ -206,7 +207,7 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
       console.log('✅ Expense deleted successfully');
       queryClient.invalidateQueries({ queryKey: [['projects', 'getAll']] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('❌ Delete expense error:', error);
     }
   });
@@ -216,7 +217,7 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
       console.log('✅ Change order created successfully');
       queryClient.invalidateQueries({ queryKey: [['projects', 'getAll']] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('❌ Create change order error:', error);
     }
   });
@@ -226,7 +227,7 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
       console.log('✅ Change order updated successfully');
       queryClient.invalidateQueries({ queryKey: [['projects', 'getAll']] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('❌ Update change order error:', error);
     }
   });
@@ -236,7 +237,7 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
       console.log('✅ Change order deleted successfully');
       queryClient.invalidateQueries({ queryKey: [['projects', 'getAll']] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('❌ Delete change order error:', error);
     }
   });
@@ -688,4 +689,36 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     syncToBackend,
     clearAllData
   ]);
+  } catch (error) {
+    console.error('❌ Critical error in ProjectProvider:', error);
+    // Return a safe fallback state
+    return {
+      projects: [],
+      allProjects: [],
+      isLoading: false,
+      error: null,
+      isOnline: false,
+      lastSyncTime: null,
+      selectedFilter: 'active' as const,
+      setSelectedFilter: () => {},
+      selectedPeriod: 'monthly' as const,
+      setSelectedPeriod: () => {},
+      selectedClient: 'all',
+      setSelectedClient: () => {},
+      addProject: () => {},
+      updateProject: () => {},
+      deleteProject: () => {},
+      addExpense: () => {},
+      updateExpense: () => {},
+      deleteExpense: () => {},
+      addChangeOrder: () => {},
+      updateChangeOrder: () => {},
+      deleteChangeOrder: () => {},
+      completeProject: () => {},
+      reopenProject: () => {},
+      calculateStats: () => ({ totalRevenue: 0, totalChangeOrders: 0, totalExpenses: 0, profit: 0, profitMargin: 0, laborPercentage: 0 }),
+      syncToBackend: async () => ({ success: false, message: 'Provider error' }),
+      clearAllData: async () => {},
+    };
+  }
 });
