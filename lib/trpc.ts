@@ -1,5 +1,5 @@
 import { createTRPCReact } from "@trpc/react-query";
-import { httpLink } from "@trpc/client";
+import { httpLink, createTRPCProxyClient, httpBatchLink } from "@trpc/client";
 import type { AppRouter } from "@/backend/trpc/app-router";
 import superjson from "superjson";
 
@@ -128,6 +128,16 @@ export const trpcClient = trpc.createClient({
           throw error;
         }
       },
+    }),
+  ],
+});
+
+// Create a vanilla client for use outside React components
+export const vanillaTrpcClient = createTRPCProxyClient<AppRouter>({
+  links: [
+    httpBatchLink({
+      url: trpcUrl,
+      transformer: superjson,
     }),
   ],
 });

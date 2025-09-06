@@ -27,10 +27,13 @@ export default publicProcedure
     
     // Create properly typed updates object
     const updates: Partial<Project> = {
-      ...otherUpdates,
-      // Handle completedAt field - convert null to undefined to match Project interface
-      completedAt: completedAt === null ? undefined : completedAt
+      ...otherUpdates
     };
+    
+    // Handle completedAt field separately to avoid type issues
+    if (completedAt !== undefined) {
+      updates.completedAt = completedAt === null ? undefined : completedAt;
+    }
     
     return projectsDb.update(input.id, updates);
   });

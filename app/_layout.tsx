@@ -39,14 +39,26 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
     if (this.state.hasError) {
       return (
         <View style={errorStyles.container}>
-          <Text style={errorStyles.title}>Something went wrong</Text>
+          <Text style={errorStyles.title}>App Error</Text>
           <Text style={errorStyles.message}>
-            The app encountered an error. Try clearing the data to fix it.
+            The app encountered an error and needs to restart. This usually happens due to corrupted data or network issues.
           </Text>
+          
+          <TouchableOpacity 
+            style={[errorStyles.button, { backgroundColor: theme.colors.secondary }]}
+            onPress={() => {
+              console.log('🔄 User requested app restart');
+              this.setState({ hasError: false, error: undefined });
+            }}
+          >
+            <Text style={errorStyles.buttonText}>Restart App</Text>
+          </TouchableOpacity>
+          
           <TouchableOpacity 
             style={errorStyles.button}
             onPress={async () => {
               try {
+                console.log('🧹 User requested data clear');
                 await AsyncStorage.removeItem('homeslam_projects');
                 await AsyncStorage.removeItem('homeslam_projects_backup');
                 console.log('✅ Storage cleared successfully');
@@ -60,18 +72,19 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
           >
             <Text style={errorStyles.buttonText}>Clear Data & Restart</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={[errorStyles.button, { backgroundColor: theme.colors.secondary }]}
-            onPress={() => {
-              this.setState({ hasError: false, error: undefined });
-            }}
-          >
-            <Text style={errorStyles.buttonText}>Try Again</Text>
-          </TouchableOpacity>
+          
           {__DEV__ && (
-            <Text style={errorStyles.debugText}>
-              Error: {this.state.error?.message}
-            </Text>
+            <View style={errorStyles.debugContainer}>
+              <Text style={errorStyles.debugTitle}>Debug Info:</Text>
+              <Text style={errorStyles.debugText}>
+                {this.state.error?.name}: {this.state.error?.message}
+              </Text>
+              {this.state.error?.stack && (
+                <Text style={errorStyles.debugText}>
+                  Stack: {this.state.error.stack.substring(0, 300)}...
+                </Text>
+              )}
+            </View>
           )}
         </View>
       );
@@ -113,12 +126,24 @@ const errorStyles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600' as const,
   },
+  debugContainer: {
+    marginTop: 24,
+    padding: 16,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 8,
+    width: '100%',
+  },
+  debugTitle: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: theme.colors.text,
+    marginBottom: 8,
+  },
   debugText: {
     fontSize: 12,
     color: theme.colors.textLight,
-    textAlign: 'center',
     fontFamily: 'monospace',
-    marginTop: 16,
+    marginBottom: 4,
   },
 });
 

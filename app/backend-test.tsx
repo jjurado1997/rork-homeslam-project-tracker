@@ -101,9 +101,9 @@ export default function BackendTestScreen() {
     addResult('Testing tRPC client...');
     
     try {
-      // Import trpcClient for direct calls
-      const { trpcClient } = await import('@/lib/trpc');
-      const result = await trpcClient.example.hi.query.query();
+      // Import vanilla tRPC client for direct calls
+      const { vanillaTrpcClient } = await import('@/lib/trpc');
+      const result = await vanillaTrpcClient.example.hi.query.query();
       addResult(`✅ tRPC client successful: ${JSON.stringify(result)}`);
     } catch (error: any) {
       addResult(`❌ tRPC client error: ${error?.message || error}`);
@@ -117,8 +117,8 @@ export default function BackendTestScreen() {
     addResult('Testing projects query...');
     
     try {
-      const { trpcClient } = await import('@/lib/trpc');
-      const result = await trpcClient.projects.getAll.query();
+      const { vanillaTrpcClient } = await import('@/lib/trpc');
+      const result = await vanillaTrpcClient.projects.getAll.query();
       addResult(`✅ Projects query successful: ${result.length} projects`);
     } catch (error: any) {
       addResult(`❌ Projects query error: ${error?.message || error}`);
