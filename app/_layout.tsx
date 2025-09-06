@@ -117,14 +117,32 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
-      retryDelay: 500,
-      staleTime: 5 * 60 * 1000,
-      gcTime: 10 * 60 * 1000,
+      retry: (failureCount, error: any) => {
+        // Don't retry on certain errors
+        if (error?.message?.includes('JSON Parse error') || 
+            error?.message?.includes('Server returned non-JSON response')) {
+          return false;
+        }
+        return failureCount < 2; // Retry up to 2 times
+      },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
+      staleTime: 2 * 60 * 1000, // 2 minutes
+      gcTime: 5 * 60 * 1000, // 5 minutes
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+      networkMode: 'offlineFirst',
     },
     mutations: {
-      retry: 1,
-      retryDelay: 500,
+      retry: (failureCount, error: any) => {
+        // Don't retry mutations on parse errors
+        if (error?.message?.includes('JSON Parse error') || 
+            error?.message?.includes('Server returned non-JSON response')) {
+          return false;
+        }
+        return failureCount < 1; // Retry once for mutations
+      },
+      retryDelay: 1000,
+      networkMode: 'offlineFirst',
     },
   },
 });

@@ -18,71 +18,130 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
 
 
-  // Load local data on startup
+  // Load local data on startup with robust error handling
   useEffect(() => {
     const loadLocalData = async () => {
       try {
         console.log('📱 Loading local data...');
         const stored = await AsyncStorage.getItem('homeslam_projects');
-        if (stored) {
-          const parsedProjects = JSON.parse(stored).map((p: any) => ({
-            ...p,
-            projectStartDate: new Date(p.projectStartDate),
-            createdAt: new Date(p.createdAt),
-            completedAt: p.completedAt ? new Date(p.completedAt) : undefined,
-            expenses: p.expenses?.map((e: any) => ({
-              ...e,
-              date: new Date(e.date)
-            })) || [],
-            changeOrders: p.changeOrders?.map((co: any) => ({
-              ...co,
-              date: new Date(co.date)
-            })) || []
-          }));
-          setLocalProjects(parsedProjects);
-          console.log(`✅ Loaded ${parsedProjects.length} projects from local storage`);
+        if (stored && stored.trim()) {
+          try {
+            // Validate JSON before parsing
+            const parsed = JSON.parse(stored);
+            if (!Array.isArray(parsed)) {
+              throw new Error('Invalid data format: not an array');
+            }
+            
+            const parsedProjects = parsed.map((p: any, index: number) => {
+              try {
+                // Validate required fields
+                if (!p.id || !p.name) {
+                  console.warn(`⚠️ Skipping invalid project at index ${index}:`, p);
+                  return null;
+                }
+                
+                return {
+                  ...p,
+                  projectStartDate: p.projectStartDate ? new Date(p.projectStartDate) : new Date(),
+                  createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
+                  completedAt: p.completedAt ? new Date(p.completedAt) : undefined,
+                  expenses: Array.isArray(p.expenses) ? p.expenses.map((e: any) => ({
+                    ...e,
+                    date: e.date ? new Date(e.date) : new Date(),
+                    amount: typeof e.amount === 'number' ? e.amount : 0
+                  })) : [],
+                  changeOrders: Array.isArray(p.changeOrders) ? p.changeOrders.map((co: any) => ({
+                    ...co,
+                    date: co.date ? new Date(co.date) : new Date(),
+                    amount: typeof co.amount === 'number' ? co.amount : 0
+                  })) : [],
+                  totalRevenue: typeof p.totalRevenue === 'number' ? p.totalRevenue : 0,
+                  isCompleted: Boolean(p.isCompleted)
+                };
+              } catch (projectError) {
+                console.warn(`⚠️ Error parsing project at index ${index}:`, projectError);
+                return null;
+              }
+            }).filter(Boolean); // Remove null entries
+            
+            setLocalProjects(parsedProjects);
+            console.log(`✅ Loaded ${parsedProjects.length} valid projects from local storage`);
+          } catch (parseError) {
+            console.error('❌ JSON parse error, clearing corrupted data:', parseError);
+            await AsyncStorage.removeItem('homeslam_projects');
+            setLocalProjects([]);
+          }
+        } else {
+          console.log('📱 No local data found, starting fresh');
+          setLocalProjects([]);
         }
       } catch (error) {
-        console.error('❌ Error loading local data:', error);
+        console.error('❌ Critical error loading local data:', error);
+        // Clear potentially corrupted data and start fresh
+        try {
+          await AsyncStorage.removeItem('homeslam_projects');
+          setLocalProjects([]);
+          console.log('🧹 Cleared corrupted data, starting fresh');
+        } catch (clearError) {
+          console.error('❌ Failed to clear corrupted data:', clearError);
+          setLocalProjects([]);
+        }
       }
     };
     loadLocalData();
   }, []);
 
-  // Use tRPC to get projects from backend with fallback
+  // Use tRPC to get projects from backend with robust fallback
   const projectsQuery = trpc.projects.getAll.useQuery(undefined, {
     retry: (failureCount, error) => {
-      console.log(`🔄 Backend query retry attempt ${failureCount}:`, error);
-      if (failureCount >= 1) {
-        console.log('🔌 Backend unavailable, switching to offline mode');
+      console.log(`🔄 Backend query retry attempt ${failureCount}:`, error?.message || 'Unknown error');
+      if (failureCount >= 2) {
+        console.log('🔌 Backend unavailable after retries, switching to offline mode');
         setIsOnline(false);
       }
-      return failureCount < 1; // Only retry once
+      return failureCount < 2; // Retry twice before giving up
     },
-    retryDelay: 2000,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    networkMode: 'offlineFirst' // Prefer cached data when network is unreliable
   });
 
-  // Handle query success and error states
+  // Handle query success and error states with better error recovery
   useEffect(() => {
     if (projectsQuery.isSuccess && projectsQuery.data) {
       console.log('🌐 Backend connected successfully');
       setIsOnline(true);
       setLastSyncTime(new Date());
-      // Sync backend data to local storage
-      if (projectsQuery.data.length > 0) {
+      
+      // Sync backend data to local storage with validation
+      if (Array.isArray(projectsQuery.data)) {
+        // Use AsyncStorage directly here to avoid dependency issues
         AsyncStorage.setItem('homeslam_projects', JSON.stringify(projectsQuery.data))
-          .then(() => console.log('💾 Synced backend data to local storage'))
+          .then(() => {
+            setLocalProjects(projectsQuery.data);
+            console.log('💾 Synced backend data to local storage');
+          })
           .catch((err: Error) => console.error('❌ Failed to sync to local:', err));
+      } else {
+        console.warn('⚠️ Backend returned invalid data format');
       }
     }
   }, [projectsQuery.isSuccess, projectsQuery.data]);
 
   useEffect(() => {
     if (projectsQuery.isError) {
-      console.log('🔌 Backend connection failed, using offline mode:', projectsQuery.error?.message);
+      const errorMessage = projectsQuery.error?.message || 'Unknown error';
+      console.log('🔌 Backend connection failed, using offline mode:', errorMessage);
       setIsOnline(false);
+      
+      // If it's a JSON parse error, it might be a server issue
+      if (errorMessage.includes('JSON Parse error') || errorMessage.includes('Unexpected character')) {
+        console.log('🔧 Detected server response issue, will retry later');
+        // Don't immediately retry, let the retry logic handle it
+      }
     }
   }, [projectsQuery.isError, projectsQuery.error]);
 
@@ -182,6 +241,49 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     }
   });
 
+  // Save to local storage helper with validation and backup
+  const saveToLocal = useCallback(async (updatedProjects: Project[]) => {
+    try {
+      // Validate data before saving
+      if (!Array.isArray(updatedProjects)) {
+        throw new Error('Invalid data: not an array');
+      }
+      
+      // Create a backup of current data first
+      const currentData = await AsyncStorage.getItem('homeslam_projects');
+      if (currentData) {
+        await AsyncStorage.setItem('homeslam_projects_backup', currentData);
+      }
+      
+      // Serialize and validate JSON
+      const serialized = JSON.stringify(updatedProjects);
+      if (serialized.length > 5 * 1024 * 1024) { // 5MB limit
+        throw new Error('Data too large to store');
+      }
+      
+      // Test parse to ensure data integrity
+      JSON.parse(serialized);
+      
+      await AsyncStorage.setItem('homeslam_projects', serialized);
+      setLocalProjects(updatedProjects);
+      console.log(`💾 Saved ${updatedProjects.length} projects to local storage`);
+    } catch (error) {
+      console.error('❌ Failed to save to local storage:', error);
+      
+      // Try to restore from backup if save failed
+      try {
+        const backup = await AsyncStorage.getItem('homeslam_projects_backup');
+        if (backup) {
+          const backupData = JSON.parse(backup);
+          setLocalProjects(backupData);
+          console.log('🔄 Restored from backup after save failure');
+        }
+      } catch (restoreError) {
+        console.error('❌ Failed to restore from backup:', restoreError);
+      }
+    }
+  }, []);
+
   // Use backend data if available, otherwise use local data
   const projects = useMemo(() => {
     if (isOnline && projectsQuery.data) {
@@ -189,17 +291,6 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     }
     return localProjects;
   }, [isOnline, projectsQuery.data, localProjects]);
-
-  // Save to local storage helper
-  const saveToLocal = useCallback(async (updatedProjects: Project[]) => {
-    try {
-      await AsyncStorage.setItem('homeslam_projects', JSON.stringify(updatedProjects));
-      setLocalProjects(updatedProjects);
-      console.log('💾 Saved to local storage');
-    } catch (error) {
-      console.error('❌ Failed to save to local storage:', error);
-    }
-  }, []);
 
   // Hybrid functions that work online and offline
   const addProject = useCallback((project: Omit<Project, 'id' | 'createdAt' | 'expenses' | 'isCompleted' | 'changeOrders'>) => {
