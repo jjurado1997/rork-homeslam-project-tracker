@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const [ProjectProvider, useProjects] = createContextHook(() => {
   const queryClient = useQueryClient();
-  const [selectedFilter, setSelectedFilter] = useState<'all' | 'active' | 'completed'>('active');
+  const [selectedFilter, setSelectedFilter] = useState<'all' | 'active' | 'completed'>('all');
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly'>('monthly');
   const [selectedClient, setSelectedClient] = useState<string>('all');
   const [localProjects, setLocalProjects] = useState<Project[]>([]);
@@ -545,16 +545,30 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
   const filteredProjects = useMemo(() => {
     let filtered = projects;
     
+    console.log('🔍 Filtering projects:', {
+      totalProjects: projects.length,
+      selectedFilter,
+      selectedPeriod,
+      selectedClient,
+      projectNames: projects.map(p => ({ name: p.name, isCompleted: p.isCompleted, startDate: p.projectStartDate }))
+    });
+    
+    // Apply status filter
     if (selectedFilter === 'active') {
       filtered = filtered.filter(p => !p.isCompleted || p.isCompleted === undefined);
+      console.log('🔍 After active filter:', filtered.length, 'projects');
     } else if (selectedFilter === 'completed') {
       filtered = filtered.filter(p => p.isCompleted === true);
+      console.log('🔍 After completed filter:', filtered.length, 'projects');
     }
 
+    // Apply client filter
     if (selectedClient !== 'all') {
       filtered = filtered.filter(p => p.client === selectedClient);
+      console.log('🔍 After client filter:', filtered.length, 'projects');
     }
 
+    // Apply period filter - but make it more lenient for existing projects
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfWeek = new Date(startOfDay);
@@ -562,49 +576,66 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     
     // Calculate quarter start: Q1=Jan(0-2), Q2=Apr(3-5), Q3=Jul(6-8), Q4=Oct(9-11)
-    // JavaScript months are 0-based: Jan=0, Feb=1, ..., Jul=6, Aug=7, Sep=8, ..., Dec=11
-    const currentMonth = now.getMonth(); // 0-based: Jan=0, Feb=1, ..., Dec=11
+    const currentMonth = now.getMonth();
     const quarterStartMonth = Math.floor(currentMonth / 3) * 3;
     const startOfQuarter = new Date(now.getFullYear(), quarterStartMonth, 1);
-    startOfQuarter.setHours(0, 0, 0, 0); // Ensure we start at beginning of day
+    startOfQuarter.setHours(0, 0, 0, 0);
 
+    // For period filtering, be more inclusive - show projects that are still relevant
     switch (selectedPeriod) {
       case 'daily':
-        // Show projects that start TODAY only (not future dates)
+        // Show projects that start TODAY or are active (not completed)
         filtered = filtered.filter(p => {
           const projectDate = new Date(p.projectStartDate);
           projectDate.setHours(0, 0, 0, 0);
           const todayStart = new Date(startOfDay);
           todayStart.setHours(0, 0, 0, 0);
-          return projectDate.getTime() === todayStart.getTime();
+          const isToday = projectDate.getTime() === todayStart.getTime();
+          const isActiveProject = !p.isCompleted;
+          return isToday || isActiveProject;
         });
         break;
       case 'weekly':
-        filtered = filtered.filter(p => p.projectStartDate >= startOfWeek);
+        // Show projects from this week OR active projects
+        filtered = filtered.filter(p => {
+          const isThisWeek = p.projectStartDate >= startOfWeek;
+          const isActiveProject = !p.isCompleted;
+          return isThisWeek || isActiveProject;
+        });
         break;
       case 'monthly':
-        filtered = filtered.filter(p => p.projectStartDate >= startOfMonth);
+        // Show projects from this month OR active projects
+        filtered = filtered.filter(p => {
+          const isThisMonth = p.projectStartDate >= startOfMonth;
+          const isActiveProject = !p.isCompleted;
+          return isThisMonth || isActiveProject;
+        });
         break;
       case 'quarterly':
+        // Show projects from this quarter OR active projects
         filtered = filtered.filter(p => {
-          // Normalize project date to start of day for comparison
           const projectDate = new Date(p.projectStartDate);
           projectDate.setHours(0, 0, 0, 0);
+          const isThisQuarter = projectDate >= startOfQuarter;
+          const isActiveProject = !p.isCompleted;
           console.log('Quarterly filter debug:', {
             projectName: p.name,
             projectStartDate: p.projectStartDate.toISOString(),
             normalizedProjectDate: projectDate.toISOString(),
             startOfQuarter: startOfQuarter.toISOString(),
-            isInQuarter: projectDate >= startOfQuarter,
-            currentMonth: now.getMonth(),
-            quarterStartMonth
+            isThisQuarter,
+            isActiveProject,
+            willShow: isThisQuarter || isActiveProject
           });
-          return projectDate >= startOfQuarter;
+          return isThisQuarter || isActiveProject;
         });
         break;
     }
     
-
+    console.log('🔍 Final filtered projects:', {
+      count: filtered.length,
+      names: filtered.map(p => p.name)
+    });
 
     return filtered.sort((a, b) => b.projectStartDate.getTime() - a.projectStartDate.getTime());
   }, [projects, selectedFilter, selectedPeriod, selectedClient]);
