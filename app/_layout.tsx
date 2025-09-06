@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect, Component, ReactNode } from "react";
+import React, { useEffect, useState, Component, ReactNode } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { ProjectProvider } from "@/hooks/project-store";
@@ -27,6 +27,9 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
   componentDidCatch(error: Error, errorInfo: any) {
     console.error('💥 Error caught by boundary:', error, errorInfo);
     console.error('📍 Component stack:', errorInfo.componentStack);
+    console.error('📍 Error name:', error.name);
+    console.error('📍 Error message:', error.message);
+    console.error('📍 Error stack:', error.stack);
     
     // Don't automatically clear data - let user decide
     console.log('🔧 Error boundary activated - user can clear data manually if needed');
@@ -230,34 +233,64 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
+
   useEffect(() => {
     const initializeApp = async () => {
       try {
         console.log('🚀 Initializing app...');
-        // Shorter delay for mobile
+        
+        // Force hide splash screen after a maximum timeout
+        const forceHideTimeout = setTimeout(() => {
+          console.log('⏰ Force hiding splash screen after timeout');
+          SplashScreen.hideAsync().catch(e => console.warn('⚠️ Force hide failed:', e));
+          setIsInitialized(true);
+        }, 3000); // 3 second maximum
+        
+        // Normal initialization
         setTimeout(async () => {
           try {
             await SplashScreen.hideAsync();
             console.log('✅ App initialized successfully');
+            clearTimeout(forceHideTimeout);
+            setIsInitialized(true);
           } catch (splashError) {
             console.warn('⚠️ Splash screen error (non-critical):', splashError);
+            setIsInitialized(true);
           }
-        }, 50); // Reduced from 100ms to 50ms
+        }, 50);
       } catch (error) {
         console.error('❌ Error initializing app:', error);
+        setInitError(String(error));
+        
         // Force hide splash screen after short delay
         setTimeout(() => {
           try {
             SplashScreen.hideAsync();
+            setIsInitialized(true);
           } catch (splashError) {
             console.warn('⚠️ Failed to hide splash screen:', splashError);
+            setIsInitialized(true);
           }
-        }, 200); // Reduced from 500ms to 200ms
+        }, 200);
       }
     };
     
     initializeApp();
   }, []);
+
+  // Show loading screen while initializing
+  if (!isInitialized) {
+    return (
+      <View style={errorStyles.container}>
+        <Text style={errorStyles.message}>Starting app...</Text>
+        {initError && (
+          <Text style={errorStyles.debugText}>Error: {initError}</Text>
+        )}
+      </View>
+    );
+  }
 
   return (
     <ErrorBoundary>

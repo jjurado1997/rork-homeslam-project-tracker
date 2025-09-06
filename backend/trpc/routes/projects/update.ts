@@ -16,7 +16,7 @@ const updateProjectSchema = z.object({
     completedAt: z.union([
       z.string().transform(str => new Date(str)), 
       z.null()
-    ]).optional().nullable()
+    ]).optional()
   })
 });
 
@@ -29,7 +29,7 @@ export default publicProcedure
     const updates: Partial<Project> = {
       ...otherUpdates,
       // Handle completedAt field - convert null to undefined to match Project interface
-      ...(completedAt !== undefined && { completedAt: completedAt || undefined })
+      completedAt: completedAt === null ? undefined : completedAt
     };
     
     return projectsDb.update(input.id, updates);
