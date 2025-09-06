@@ -5,7 +5,106 @@ import superjson from "superjson";
 
 export const trpc = createTRPCReact<AppRouter>();
 
-const getBaseUrl = () => {
+// Function to test if a URL is reachable and returns JSON
+const testBackendUrl = async (url: string): Promise<boolean> => {
+  try {
+    console.log('🧪 Testing backend URL:', url);
+    const response = await fetch(`${url}/api`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      signal: (() => {
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), 3000);
+        return controller.signal;
+      })()
+    });
+    
+    const contentType = response.headers.get('content-type') || '';
+    const isJson = contentType.includes('application/json');
+    
+    console.log('🧪 Test result for', url, ':', {
+      status: response.status,
+      contentType,
+      isJson,
+      ok: response.ok
+    });
+    
+    return response.ok && isJson;
+  } catch (error) {
+    console.log('🧪 Test failed for', url, ':', error);
+    return false;
+  }
+};
+
+const getBaseUrl = async (): Promise<string> => {
+  // For web environment - use current origin
+  if (typeof window !== 'undefined') {
+    console.log('🌐 Web environment detected, using:', window.location.origin);
+    return window.location.origin;
+  }
+  
+  // Build list of possible URLs to try
+  const candidateUrls: string[] = [];
+  
+  // Add environment variables
+  const envUrls = [
+    process.env.EXPO_PUBLIC_API_URL,
+    process.env.EXPO_PUBLIC_DEV_SERVER_URL,
+    process.env.EXPO_DEV_SERVER_URL,
+  ].filter(Boolean) as string[];
+  candidateUrls.push(...envUrls);
+  
+  // Try to detect from current URL in development
+  if (typeof global !== 'undefined' && (global as any).__DEV__) {
+    try {
+      const currentUrl = (global as any).location?.href;
+      if (currentUrl && typeof currentUrl === 'string') {
+        console.log('🔍 Current URL detected:', currentUrl);
+        const match = currentUrl.match(/https?:\/\/([^/:]+)/);
+        if (match && match[1]) {
+          const host = match[1];
+          const backendUrl = `http://${host.replace(/:\d+$/, ':8081')}`;
+          candidateUrls.push(backendUrl);
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to detect from current URL:', error);
+    }
+  }
+  
+  // Add common development URLs
+  candidateUrls.push(
+    'http://localhost:8081',
+    'http://127.0.0.1:8081',
+    'http://192.168.1.100:8081', // Common local network IP
+    'http://10.0.0.100:8081',    // Another common local network IP
+  );
+  
+  // Remove duplicates
+  const uniqueUrls = [...new Set(candidateUrls)];
+  
+  console.log('🔍 Testing candidate URLs:', uniqueUrls);
+  
+  // Test each URL and return the first working one
+  for (const url of uniqueUrls) {
+    const isWorking = await testBackendUrl(url);
+    if (isWorking) {
+      console.log('✅ Found working backend URL:', url);
+      return url;
+    }
+  }
+  
+  // If no URL works, return localhost as fallback
+  const fallbackUrl = 'http://localhost:8081';
+  console.log('🔄 No working backend found, using fallback:', fallbackUrl);
+  return fallbackUrl;
+};
+
+// Synchronous version for immediate use
+const getBaseUrlSync = () => {
   // For web environment - use current origin
   if (typeof window !== 'undefined') {
     console.log('🌐 Web environment detected, using:', window.location.origin);
@@ -13,7 +112,6 @@ const getBaseUrl = () => {
   }
   
   // For mobile environment - try to get the development server URL from Expo
-  // Check various environment variables that Expo might set
   const possibleUrls = [
     process.env.EXPO_PUBLIC_API_URL,
     process.env.EXPO_PUBLIC_DEV_SERVER_URL,
@@ -26,13 +124,33 @@ const getBaseUrl = () => {
     return url;
   }
   
-  // Final fallback - localhost (this should work for both web and mobile in dev)
+  // Try to detect from current URL in development
+  if (typeof global !== 'undefined' && (global as any).__DEV__) {
+    try {
+      const currentUrl = (global as any).location?.href;
+      if (currentUrl && typeof currentUrl === 'string') {
+        console.log('🔍 Current URL detected:', currentUrl);
+        const match = currentUrl.match(/https?:\/\/([^/:]+)/);
+        if (match && match[1]) {
+          const host = match[1];
+          const backendUrl = `http://${host.replace(/:\d+$/, ':8081')}`;
+          console.log('📱 Expo tunnel detected, using backend URL:', backendUrl);
+          return backendUrl;
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to detect Expo tunnel URL:', error);
+    }
+  }
+  
+  // Final fallback - localhost
   const fallbackUrl = 'http://localhost:8081';
   console.log('🔄 Using fallback URL:', fallbackUrl);
   return fallbackUrl;
 };
 
-const baseUrl = getBaseUrl();
+// Use sync version for initial setup, async version will be used later for testing
+const baseUrl = getBaseUrlSync();
 const trpcUrl = `${baseUrl}/api/trpc`;
 
 console.log('🔗 tRPC client configuration:', {
@@ -40,6 +158,19 @@ console.log('🔗 tRPC client configuration:', {
   trpcUrl,
   environment: typeof window !== 'undefined' ? 'web' : 'mobile'
 });
+
+// Test and potentially update the URL asynchronously
+if (typeof window === 'undefined') {
+  // Only do this for mobile (non-web) environments
+  getBaseUrl().then((testedUrl) => {
+    if (testedUrl !== baseUrl) {
+      console.log('🔄 Backend URL updated after testing:', testedUrl);
+      // Note: This won't update existing clients, but will help with debugging
+    }
+  }).catch((error) => {
+    console.warn('⚠️ Failed to test backend URLs:', error);
+  });
+}
 
 // Custom fetch function with enhanced error handling
 const customFetch = async (url: URL | RequestInfo, options?: RequestInit) => {
