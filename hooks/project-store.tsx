@@ -9,6 +9,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 export const [ProjectProvider, useProjects] = createContextHook(() => {
+  // Add error state to track any issues
+  const [hasError, setHasError] = useState(false);
   const queryClient = useQueryClient();
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'active' | 'completed'>('active');
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly'>('monthly');

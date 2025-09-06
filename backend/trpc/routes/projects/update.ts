@@ -32,7 +32,11 @@ export default publicProcedure
     
     // Handle completedAt field separately to avoid type issues
     if (completedAt !== undefined) {
-      updates.completedAt = completedAt === null ? undefined : completedAt;
+      if (completedAt === null) {
+        updates.completedAt = undefined;
+      } else {
+        updates.completedAt = completedAt;
+      }
     }
     
     return projectsDb.update(input.id, updates);

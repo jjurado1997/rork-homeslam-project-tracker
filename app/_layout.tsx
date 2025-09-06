@@ -31,17 +31,26 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
     console.error('📍 Error message:', error.message);
     console.error('📍 Error stack:', error.stack);
     
-    // Don't automatically clear data - let user decide
-    console.log('🔧 Error boundary activated - user can clear data manually if needed');
+    // Try to clear potentially corrupted data automatically
+    try {
+      AsyncStorage.removeItem('homeslam_projects').catch(e => 
+        console.warn('Failed to clear storage:', e)
+      );
+      AsyncStorage.removeItem('homeslam_projects_backup').catch(e => 
+        console.warn('Failed to clear backup:', e)
+      );
+    } catch (clearError) {
+      console.warn('Failed to clear storage in error boundary:', clearError);
+    }
   }
 
   render() {
     if (this.state.hasError) {
       return (
         <View style={errorStyles.container}>
-          <Text style={errorStyles.title}>App Error</Text>
+          <Text style={errorStyles.title}>Something went wrong</Text>
           <Text style={errorStyles.message}>
-            The app encountered an error and needs to restart. This usually happens due to corrupted data or network issues.
+            Sorry about that. You can go back to Expo home or try to reload the project.
           </Text>
           
           <TouchableOpacity 
@@ -51,7 +60,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
               this.setState({ hasError: false, error: undefined });
             }}
           >
-            <Text style={errorStyles.buttonText}>Restart App</Text>
+            <Text style={errorStyles.buttonText}>Try Again</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -70,7 +79,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
               }
             }}
           >
-            <Text style={errorStyles.buttonText}>Clear Data & Restart</Text>
+            <Text style={errorStyles.buttonText}>Reset App Data</Text>
           </TouchableOpacity>
           
           {__DEV__ && (
