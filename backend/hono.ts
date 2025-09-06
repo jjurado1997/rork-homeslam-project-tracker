@@ -7,22 +7,70 @@ import { createContext } from "./trpc/create-context";
 // app will be mounted at /api
 const app = new Hono();
 
-// Enable CORS for all routes
-app.use("*", cors());
+// Enable CORS for all routes with proper configuration
+app.use("*", cors({
+  origin: '*', // Allow all origins in development
+  credentials: true,
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization'],
+}));
 
-// Mount tRPC router at /trpc
+// Add request logging middleware
+app.use("*", async (c, next) => {
+  const start = Date.now();
+  console.log(`📡 ${c.req.method} ${c.req.url}`);
+  
+  try {
+    await next();
+    const ms = Date.now() - start;
+    console.log(`✅ ${c.req.method} ${c.req.url} - ${c.res.status} (${ms}ms)`);
+  } catch (error) {
+    const ms = Date.now() - start;
+    console.error(`❌ ${c.req.method} ${c.req.url} - Error (${ms}ms):`, error);
+    throw error;
+  }
+});
+
+// Mount tRPC router at /trpc with proper error handling
 app.use(
   "/trpc/*",
   trpcServer({
     endpoint: "/api/trpc",
     router: appRouter,
     createContext,
+    onError: ({ error, path, type, ctx }) => {
+      console.error(`❌ tRPC Error on ${path} (${type}):`, error);
+      console.error('Context:', ctx);
+    },
   })
 );
 
 // Simple health check endpoint
 app.get("/", (c) => {
-  return c.json({ status: "ok", message: "API is running" });
+  console.log('🏥 Health check requested');
+  return c.json({ 
+    status: "ok", 
+    message: "HomeSlam API is running",
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: "/api",
+      trpc: "/api/trpc"
+    }
+  });
+});
+
+// Catch-all route for debugging
+app.all("*", (c) => {
+  console.log(`🔍 Unhandled route: ${c.req.method} ${c.req.url}`);
+  return c.json({ 
+    error: "Route not found", 
+    method: c.req.method,
+    path: c.req.url,
+    availableEndpoints: {
+      health: "/api",
+      trpc: "/api/trpc/*"
+    }
+  }, 404);
 });
 
 export default app;

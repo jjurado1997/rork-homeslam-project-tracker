@@ -1,73 +1,185 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { trpc } from '@/lib/trpc';
 import { theme } from '@/constants/theme';
 
 export default function BackendTestScreen() {
-  const [name, setName] = useState<string>('');
-  const [result, setResult] = useState<string>('');
+  const [testResults, setTestResults] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const hiMutation = trpc.example.hi.useMutation({
-    onSuccess: (data) => {
-      setResult(`Hello ${data.hello}! Server time: ${data.date}`);
-    },
-    onError: (error) => {
-      Alert.alert('Error', error.message);
-      console.error('tRPC Error:', error);
-    },
-  });
+  const addResult = (message: string) => {
+    setTestResults(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
+  };
 
-  const handleSubmit = () => {
-    if (!name.trim()) {
-      Alert.alert('Error', 'Please enter a name');
-      return;
+  const clearResults = () => {
+    setTestResults([]);
+  };
+
+  const testHealthEndpoint = async () => {
+    setIsLoading(true);
+    addResult('Testing health endpoint...');
+    
+    try {
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+      const healthUrl = `${baseUrl}/api`;
+      
+      addResult(`Fetching: ${healthUrl}`);
+      
+      const response = await fetch(healthUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+      
+      addResult(`Response status: ${response.status} ${response.statusText}`);
+      addResult(`Content-Type: ${response.headers.get('content-type')}`);
+      
+      const text = await response.text();
+      addResult(`Response body: ${text.substring(0, 200)}`);
+      
+      if (response.ok) {
+        try {
+          const data = JSON.parse(text);
+          addResult(`✅ Health check successful: ${data.message}`);
+        } catch (parseError) {
+          addResult(`⚠️ Health endpoint returned non-JSON: ${text}`);
+        }
+      } else {
+        addResult(`❌ Health check failed: ${response.status}`);
+      }
+    } catch (error) {
+      addResult(`❌ Health check error: ${error}`);
+    } finally {
+      setIsLoading(false);
     }
-    hiMutation.mutate({ name: name.trim() });
+  };
+
+  const testTrpcEndpoint = async () => {
+    setIsLoading(true);
+    addResult('Testing tRPC endpoint...');
+    
+    try {
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+      const trpcUrl = `${baseUrl}/api/trpc/projects.getAll`;
+      
+      addResult(`Fetching: ${trpcUrl}`);
+      
+      const response = await fetch(trpcUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      addResult(`Response status: ${response.status} ${response.statusText}`);
+      addResult(`Content-Type: ${response.headers.get('content-type')}`);
+      
+      const text = await response.text();
+      addResult(`Response body: ${text.substring(0, 200)}`);
+      
+      if (response.ok) {
+        try {
+          const data = JSON.parse(text);
+          addResult(`✅ tRPC endpoint successful`);
+        } catch (parseError) {
+          addResult(`⚠️ tRPC endpoint returned non-JSON: ${text}`);
+        }
+      } else {
+        addResult(`❌ tRPC endpoint failed: ${response.status}`);
+      }
+    } catch (error) {
+      addResult(`❌ tRPC endpoint error: ${error}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const testTrpcClient = async () => {
+    setIsLoading(true);
+    addResult('Testing tRPC client...');
+    
+    try {
+      // Import trpcClient for direct calls
+      const { trpcClient } = await import('@/lib/trpc');
+      const result = await trpcClient.example.hi.mutate({ name: 'Test User' });
+      addResult(`✅ tRPC client successful: ${JSON.stringify(result)}`);
+    } catch (error: any) {
+      addResult(`❌ tRPC client error: ${error?.message || error}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const testProjectsQuery = async () => {
+    setIsLoading(true);
+    addResult('Testing projects query...');
+    
+    try {
+      const { trpcClient } = await import('@/lib/trpc');
+      const result = await trpcClient.projects.getAll.query();
+      addResult(`✅ Projects query successful: ${result.length} projects`);
+    } catch (error: any) {
+      addResult(`❌ Projects query error: ${error?.message || error}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Backend Test</Text>
-        <Text style={styles.subtitle}>Test tRPC connection</Text>
+      <ScrollView style={styles.scrollView}>
+        <Text style={styles.title}>Backend Connection Test</Text>
         
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Enter your name:</Text>
-          <TextInput
-            style={styles.input}
-            value={name}
-            onChangeText={setName}
-            placeholder="Your name"
-            placeholderTextColor={theme.colors.textLight}
-          />
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity 
+            style={[styles.button, isLoading && styles.buttonDisabled]} 
+            onPress={testHealthEndpoint}
+            disabled={isLoading}
+          >
+            <Text style={styles.buttonText}>Test Health Endpoint</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.button, isLoading && styles.buttonDisabled]} 
+            onPress={testTrpcEndpoint}
+            disabled={isLoading}
+          >
+            <Text style={styles.buttonText}>Test tRPC Endpoint</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.button, isLoading && styles.buttonDisabled]} 
+            onPress={testTrpcClient}
+            disabled={isLoading}
+          >
+            <Text style={styles.buttonText}>Test tRPC Client</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.button, isLoading && styles.buttonDisabled]} 
+            onPress={testProjectsQuery}
+            disabled={isLoading}
+          >
+            <Text style={styles.buttonText}>Test Projects Query</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.clearButton]} 
+            onPress={clearResults}
+          >
+            <Text style={styles.clearButtonText}>Clear Results</Text>
+          </TouchableOpacity>
         </View>
-
-        <TouchableOpacity
-          style={[styles.button, hiMutation.isPending && styles.buttonDisabled]}
-          onPress={handleSubmit}
-          disabled={hiMutation.isPending}
-        >
-          <Text style={styles.buttonText}>
-            {hiMutation.isPending ? 'Sending...' : 'Say Hi to Backend'}
-          </Text>
-        </TouchableOpacity>
-
-        {result ? (
-          <View style={styles.resultContainer}>
-            <Text style={styles.resultLabel}>Response:</Text>
-            <Text style={styles.resultText}>{result}</Text>
-          </View>
-        ) : null}
-
-        {hiMutation.error && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>
-              Error: {hiMutation.error.message}
-            </Text>
-          </View>
-        )}
-      </View>
+        
+        <View style={styles.resultsContainer}>
+          <Text style={styles.resultsTitle}>Test Results:</Text>
+          {testResults.map((result, index) => (
+            <Text key={index} style={styles.resultText}>{result}</Text>
+          ))}
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -77,48 +189,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-  content: {
+  scrollView: {
     flex: 1,
-    padding: 20,
+    padding: 16,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold' as const,
     color: theme.colors.text,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: theme.colors.textLight,
-    marginBottom: 32,
-  },
-  inputContainer: {
     marginBottom: 24,
+    textAlign: 'center',
   },
-  label: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: theme.colors.text,
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: theme.colors.text,
-    backgroundColor: theme.colors.surface,
+  buttonContainer: {
+    marginBottom: 24,
   },
   button: {
     backgroundColor: theme.colors.primary,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    padding: 16,
     borderRadius: 8,
+    marginBottom: 12,
     alignItems: 'center',
-    marginBottom: 24,
   },
   buttonDisabled: {
+    backgroundColor: theme.colors.textLight,
     opacity: 0.6,
   },
   buttonText: {
@@ -126,33 +219,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600' as const,
   },
-  resultContainer: {
-    backgroundColor: theme.colors.success + '20',
-    padding: 16,
+  clearButton: {
+    backgroundColor: theme.colors.error,
+    padding: 12,
     borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: theme.colors.success,
-    marginBottom: 16,
+    alignItems: 'center',
   },
-  resultLabel: {
+  clearButtonText: {
+    color: theme.colors.surface,
     fontSize: 14,
     fontWeight: '600' as const,
-    color: theme.colors.success,
-    marginBottom: 4,
   },
-  resultText: {
-    fontSize: 16,
-    color: theme.colors.text,
-  },
-  errorContainer: {
-    backgroundColor: theme.colors.error + '20',
+  resultsContainer: {
+    backgroundColor: theme.colors.surface,
     padding: 16,
     borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: theme.colors.error,
+    minHeight: 200,
   },
-  errorText: {
-    fontSize: 14,
-    color: theme.colors.error,
+  resultsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold' as const,
+    color: theme.colors.text,
+    marginBottom: 12,
+  },
+  resultText: {
+    fontSize: 12,
+    color: theme.colors.text,
+    marginBottom: 4,
+    fontFamily: 'monospace',
   },
 });

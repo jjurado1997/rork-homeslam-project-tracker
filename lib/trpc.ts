@@ -17,7 +17,7 @@ const getBaseUrl = () => {
     return process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
   }
 
-  // Fallback for development
+  // Fallback for development - this should work on Rork platform
   console.warn('⚠️ EXPO_PUBLIC_RORK_API_BASE_URL not set, using localhost fallback');
   return 'http://localhost:3000';
 };
