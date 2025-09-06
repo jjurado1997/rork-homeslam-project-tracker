@@ -26,7 +26,7 @@ const getBaseUrl = () => {
     return url;
   }
   
-  // Final fallback - localhost
+  // Final fallback - localhost (this should work for both web and mobile in dev)
   const fallbackUrl = 'http://localhost:8081';
   console.log('🔄 Using fallback URL:', fallbackUrl);
   return fallbackUrl;
@@ -47,7 +47,7 @@ const customFetch = async (url: URL | RequestInfo, options?: RequestInit) => {
   console.log('📡 tRPC request:', { url: urlString, method: options?.method });
   
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
   
   try {
     const response = await fetch(url, {
@@ -81,7 +81,7 @@ const customFetch = async (url: URL | RequestInfo, options?: RequestInit) => {
       });
       
       if (response.status === 404) {
-        throw new Error('Backend API not found - server may not be running');
+        throw new Error('Backend server not running - start the backend server');
       } else {
         throw new Error(`Server returned HTML instead of JSON (${response.status})`);
       }

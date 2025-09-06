@@ -601,7 +601,7 @@ export default function DebugScreen() {
               console.log('🧪 Testing backend connection...');
               
               // Test the basic API endpoint first
-              const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+              const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8081';
               const apiUrl = `${baseUrl}/api`;
               
               console.log('🔗 Testing API URL:', apiUrl);
