@@ -332,6 +332,7 @@ export default function DebugScreen() {
                 {
                   id: '1',
                   name: 'Kitchen Renovation',
+                  address: '123 Main St, Anytown, USA',
                   client: 'Johnson Family',
                   totalRevenue: 25000,
                   expenses: [
@@ -340,23 +341,28 @@ export default function DebugScreen() {
                       description: 'Cabinets',
                       amount: 8000,
                       date: new Date().toISOString(),
-                      category: 'Materials'
+                      category: 'materials',
+                      subcategory: 'Home Depot'
                     },
                     {
                       id: '2',
                       description: 'Labor - Installation',
                       amount: 3500,
                       date: new Date().toISOString(),
-                      category: 'Labor'
+                      category: 'labor',
+                      subcategory: 'Luis'
                     }
                   ],
                   changeOrders: [],
                   createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString()
+                  projectStartDate: new Date().toISOString(),
+                  isCompleted: false,
+                  notes: 'Complete kitchen renovation with new cabinets and appliances'
                 },
                 {
                   id: '2',
                   name: 'Bathroom Remodel',
+                  address: '456 Oak Ave, Somewhere, USA',
                   client: 'Smith Residence',
                   totalRevenue: 18000,
                   expenses: [
@@ -365,7 +371,8 @@ export default function DebugScreen() {
                       description: 'Tiles and Fixtures',
                       amount: 4500,
                       date: new Date().toISOString(),
-                      category: 'Materials'
+                      category: 'materials',
+                      subcategory: 'Lowes'
                     }
                   ],
                   changeOrders: [
@@ -378,11 +385,14 @@ export default function DebugScreen() {
                     }
                   ],
                   createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString()
+                  projectStartDate: new Date().toISOString(),
+                  isCompleted: false,
+                  notes: 'Master bathroom renovation with modern fixtures'
                 },
                 {
                   id: '3',
                   name: 'Deck Construction',
+                  address: '789 Pine Rd, Elsewhere, USA',
                   client: 'Williams Property',
                   totalRevenue: 12000,
                   expenses: [
@@ -391,19 +401,24 @@ export default function DebugScreen() {
                       description: 'Lumber and Hardware',
                       amount: 3200,
                       date: new Date().toISOString(),
-                      category: 'Materials'
+                      category: 'materials',
+                      subcategory: 'Home Depot'
                     },
                     {
                       id: '5',
                       description: 'Equipment Rental',
                       amount: 800,
                       date: new Date().toISOString(),
-                      category: 'Equipment'
+                      category: 'other',
+                      subcategory: 'Gas'
                     }
                   ],
                   changeOrders: [],
                   createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString()
+                  projectStartDate: new Date().toISOString(),
+                  isCompleted: true,
+                  completedAt: new Date().toISOString(),
+                  notes: 'Outdoor deck construction with composite materials'
                 }
               ];
               

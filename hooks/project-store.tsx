@@ -101,7 +101,7 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
       }
       return failureCount < 1; // Only retry once before giving up
     },
-    retryDelay: 2000, // Fixed 2 second delay
+    retryDelay: 1000, // Faster retry
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
     refetchOnWindowFocus: false,
@@ -287,9 +287,14 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
 
   // Use backend data if available, otherwise use local data
   const projects = useMemo(() => {
-    if (isOnline && projectsQuery.data) {
+    // Always prefer backend data if available and online
+    if (isOnline && projectsQuery.data && Array.isArray(projectsQuery.data)) {
+      console.log('📊 Using backend data:', projectsQuery.data.length, 'projects');
       return projectsQuery.data;
     }
+    
+    // Fall back to local data
+    console.log('📱 Using local data:', localProjects.length, 'projects');
     return localProjects;
   }, [isOnline, projectsQuery.data, localProjects]);
 
