@@ -4,7 +4,7 @@ import { cors } from "hono/cors";
 import { appRouter } from "./trpc/app-router";
 import { createContext } from "./trpc/create-context";
 
-// app will be mounted at /api
+// Create the backend app that will be mounted at /api
 const app = new Hono();
 
 // Enable CORS for all routes with proper configuration
