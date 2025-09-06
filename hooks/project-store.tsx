@@ -9,8 +9,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 export const [ProjectProvider, useProjects] = createContextHook(() => {
-  // Add error state to track any issues
-  const [hasError, setHasError] = useState(false);
   const queryClient = useQueryClient();
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'active' | 'completed'>('active');
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly'>('monthly');
@@ -97,18 +95,19 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
   const projectsQuery = trpc.projects.getAll.useQuery(undefined, {
     retry: (failureCount: number, error: any) => {
       console.log(`🔄 Backend query retry attempt ${failureCount}:`, error?.message || 'Unknown error');
-      if (failureCount >= 2) {
+      if (failureCount >= 1) { // Reduce retries to fail faster
         console.log('🔌 Backend unavailable after retries, switching to offline mode');
         setIsOnline(false);
       }
-      return failureCount < 2; // Retry twice before giving up
+      return failureCount < 1; // Only retry once before giving up
     },
-    retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    retryDelay: 2000, // Fixed 2 second delay
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
-    networkMode: 'offlineFirst' // Prefer cached data when network is unreliable
+    networkMode: 'offlineFirst', // Prefer cached data when network is unreliable
+    enabled: true // Always try to fetch initially
   });
 
   // Handle query success and error states with better error recovery

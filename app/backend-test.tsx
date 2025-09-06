@@ -20,7 +20,9 @@ export default function BackendTestScreen() {
     addResult('Testing health endpoint...');
     
     try {
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+      const baseUrl = typeof window !== 'undefined' 
+        ? window.location.origin 
+        : 'https://xz3my09z8fnhklvcpdab9.rork.com';
       const healthUrl = `${baseUrl}/api`;
       
       addResult(`Fetching: ${healthUrl}`);
@@ -60,7 +62,9 @@ export default function BackendTestScreen() {
     addResult('Testing tRPC endpoint...');
     
     try {
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+      const baseUrl = typeof window !== 'undefined' 
+        ? window.location.origin 
+        : 'https://xz3my09z8fnhklvcpdab9.rork.com';
       const trpcUrl = `${baseUrl}/api/trpc/projects.getAll`;
       
       addResult(`Fetching: ${trpcUrl}`);

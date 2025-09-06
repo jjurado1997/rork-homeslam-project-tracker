@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { publicProcedure } from "../../create-context";
 import { projectsDb } from "../../../db/projects";
-import { Project } from "../../../../types/project";
 
 const updateProjectSchema = z.object({
   id: z.string(),
@@ -15,7 +14,7 @@ const updateProjectSchema = z.object({
     isCompleted: z.boolean().optional(),
     completedAt: z.union([
       z.string().transform(str => new Date(str)), 
-      z.null()
+      z.null().transform(() => undefined)
     ]).optional()
   })
 });
@@ -23,21 +22,5 @@ const updateProjectSchema = z.object({
 export default publicProcedure
   .input(updateProjectSchema)
   .mutation(({ input }) => {
-    const { completedAt, ...otherUpdates } = input.updates;
-    
-    // Create properly typed updates object
-    const updates: Partial<Project> = {
-      ...otherUpdates
-    };
-    
-    // Handle completedAt field separately to avoid type issues
-    if (completedAt !== undefined) {
-      if (completedAt === null) {
-        updates.completedAt = undefined;
-      } else {
-        updates.completedAt = completedAt;
-      }
-    }
-    
-    return projectsDb.update(input.id, updates);
+    return projectsDb.update(input.id, input.updates);
   });

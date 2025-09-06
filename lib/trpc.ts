@@ -12,14 +12,15 @@ const getBaseUrl = () => {
     return window.location.origin;
   }
   
-  // For mobile, check if we have the environment variable
+  // For mobile on Rork platform, use the tunnel URL from the start script
+  // The backend should be available at the same domain as the frontend
   if (process.env.EXPO_PUBLIC_RORK_API_BASE_URL) {
     return process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
   }
 
-  // Fallback for development - this should work on Rork platform
-  console.warn('⚠️ EXPO_PUBLIC_RORK_API_BASE_URL not set, using localhost fallback');
-  return 'http://localhost:3000';
+  // For Rork platform, try to construct the URL from the tunnel
+  // This is a fallback that should work on Rork's infrastructure
+  return 'https://xz3my09z8fnhklvcpdab9.rork.com';
 };
 
 const baseUrl = getBaseUrl();
