@@ -28,6 +28,13 @@ const getBaseUrl = () => {
     return url;
   }
   
+  // For Rork platform - try to detect the current server URL
+  if (typeof global !== 'undefined' && (global as any).location) {
+    const rorkUrl = (global as any).location.origin;
+    console.log('🚀 Rork platform detected, using:', rorkUrl);
+    return rorkUrl;
+  }
+  
   // Final fallback - localhost
   const fallbackUrl = 'http://localhost:8081';
   console.log('🔄 Using fallback URL:', fallbackUrl);

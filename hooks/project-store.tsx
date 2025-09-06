@@ -102,16 +102,19 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
         errorMessage.includes('HTML instead of JSON') ||
         errorMessage.includes('Backend API not found') ||
         errorMessage.includes('Network error') ||
-        errorMessage.includes('fetch');
+        errorMessage.includes('fetch') ||
+        errorMessage.includes('Server returned HTML') ||
+        errorMessage.includes('404') ||
+        errorMessage.includes('timeout');
       
-      if (failureCount >= 1 || isBackendUnavailable) {
+      if (failureCount >= 2 || isBackendUnavailable) {
         console.log('🔌 Backend unavailable after retries, switching to offline mode');
         setIsOnline(false);
         return false; // Don't retry
       }
-      return failureCount < 1; // Only retry once before giving up
+      return failureCount < 2; // Retry up to 2 times before giving up
     },
-    retryDelay: 1000, // Faster retry
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 3000), // Exponential backoff
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
     refetchOnWindowFocus: false,
@@ -680,6 +683,24 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     console.log('🧹 Local data cleared');
   }, []);
 
+  // Manual retry connection function
+  const retryConnection = useCallback(async () => {
+    console.log('🔄 Manual retry connection requested');
+    setIsOnline(true); // Optimistically set online
+    
+    try {
+      // Force refetch the query
+      await queryClient.invalidateQueries({ queryKey: [['projects', 'getAll']] });
+      await projectsQuery.refetch();
+      console.log('✅ Manual retry successful');
+      return { success: true, message: 'Connection restored' };
+    } catch (error) {
+      console.error('❌ Manual retry failed:', error);
+      setIsOnline(false);
+      return { success: false, message: `Retry failed: ${error}` };
+    }
+  }, [queryClient, projectsQuery]);
+
   return useMemo(() => ({
     projects: filteredProjects,
     allProjects: projects,
@@ -707,6 +728,7 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     calculateStats,
     syncToBackend,
     clearAllData,
+    retryConnection,
   }), [
     filteredProjects,
     projects,
