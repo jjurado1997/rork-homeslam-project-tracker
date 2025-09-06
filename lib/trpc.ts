@@ -18,8 +18,8 @@ const getBaseUrl = () => {
     return process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
   }
 
-  // For Rork platform, try to construct the URL from the tunnel
-  // This is a fallback that should work on Rork's infrastructure
+  // For Rork platform, the backend is served from the same tunnel as the frontend
+  // This should work for both web and mobile on Rork's infrastructure
   return 'https://xz3my09z8fnhklvcpdab9.rork.com';
 };
 
