@@ -13,12 +13,11 @@ import {
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '@/constants/theme';
-import { RefreshCw, Trash2, Database, AlertTriangle, Download, Upload, Copy, Wifi, WifiOff } from 'lucide-react-native';
+import { RefreshCw, Trash2, Database, AlertTriangle, Download, Upload, Copy } from 'lucide-react-native';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import { useProjects } from '@/hooks/project-store';
-import { migrateDataToBackend } from '@/utils/dataMigration';
-import { trpc } from '@/lib/trpc';
+
 
 interface DebugInfo {
   storageSize: string;
@@ -44,7 +43,7 @@ export default function DebugScreen() {
   const [isImporting, setIsImporting] = useState(false);
   const [importDataText, setImportDataText] = useState('');
   const [showImportInput, setShowImportInput] = useState(false);
-  const [isMigrating, setIsMigrating] = useState(false);
+
 
   const loadDebugInfo = async () => {
     try {
@@ -594,136 +593,7 @@ export default function DebugScreen() {
           </Text>
         </TouchableOpacity>
         
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.testButton]} 
-          onPress={async () => {
-            try {
-              console.log('🧪 Testing backend connection...');
-              
-              // Test the basic API endpoint first
-              const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8081';
-              const apiUrl = `${baseUrl}/api`;
-              
-              console.log('🔗 Testing API URL:', apiUrl);
-              
-              const response = await fetch(apiUrl);
-              const responseText = await response.text();
-              
-              console.log('📡 API Response:', { status: response.status, text: responseText });
-              
-              if (response.ok) {
-                // Test tRPC endpoint
-                const trpcUrl = `${baseUrl}/api/trpc/example.hi`;
-                console.log('🔗 Testing tRPC URL:', trpcUrl);
-                
-                const trpcResponse = await fetch(trpcUrl, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    json: { name: 'Test User' },
-                  }),
-                });
-                
-                const trpcText = await trpcResponse.text();
-                console.log('📡 tRPC Response:', { status: trpcResponse.status, text: trpcText });
-                
-                if (trpcResponse.ok) {
-                  Alert.alert(
-                    '✅ Backend Working!',
-                    `Backend is running correctly!\n\nAPI Status: ${response.status}\ntRPC Status: ${trpcResponse.status}\n\nYou can now create projects safely.`,
-                    [{ text: 'Great!' }]
-                  );
-                } else {
-                  Alert.alert(
-                    '⚠️ Backend Partially Working',
-                    `API is running but tRPC has issues:\n\nAPI: ${response.status} ✅\ntRPC: ${trpcResponse.status} ❌\n\nResponse: ${trpcText}`,
-                    [{ text: 'OK' }]
-                  );
-                }
-              } else {
-                Alert.alert(
-                  '❌ Backend Not Working',
-                  `Backend API is not responding correctly:\n\nStatus: ${response.status}\nResponse: ${responseText}\n\nThe app will work in offline mode only.`,
-                  [{ text: 'OK' }]
-                );
-              }
-            } catch (error: any) {
-              console.error('❌ Backend test failed:', error);
-              Alert.alert(
-                '❌ Backend Connection Failed',
-                `Could not connect to backend:\n\n${error.message}\n\nThe app will work in offline mode only.`,
-                [{ text: 'OK' }]
-              );
-            }
-          }}
-        >
-          <Database size={20} color={theme.colors.warning} />
-          <Text style={[styles.actionButtonText, { color: theme.colors.warning }]}>
-            Test Backend Connection
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.migrateButton]} 
-          onPress={async () => {
-            Alert.alert(
-              'Migrate to Backend',
-              'This will move your local data to the secure backend server. Your data will be safer and never lost again. This is recommended!',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Migrate Now',
-                  onPress: async () => {
-                    try {
-                      setIsMigrating(true);
-                      const result = await migrateDataToBackend();
-                      
-                      if (result.success) {
-                        if (result.migratedCount > 0) {
-                          Alert.alert(
-                            'Migration Successful! 🎉',
-                            `Successfully migrated ${result.migratedCount} projects to the backend. Your data is now safe and will never be lost!`,
-                            [{
-                              text: 'Great!',
-                              onPress: () => {
-                                router.replace('/(tabs)');
-                              }
-                            }]
-                          );
-                        } else {
-                          Alert.alert(
-                            'Migration Complete',
-                            result.error || 'No data needed to be migrated.',
-                            [{ text: 'OK' }]
-                          );
-                        }
-                      } else {
-                        Alert.alert(
-                          'Migration Failed',
-                          `Failed to migrate data: ${result.error}`,
-                          [{ text: 'OK' }]
-                        );
-                      }
-                    } catch (error) {
-                      Alert.alert('Error', `Migration error: ${error}`);
-                    } finally {
-                      setIsMigrating(false);
-                    }
-                  }
-                }
-              ]
-            );
-          }}
-          disabled={isMigrating}
-        >
-          <Upload size={20} color={theme.colors.success} />
-          <Text style={[styles.actionButtonText, { color: theme.colors.success }]}>
-            {isMigrating ? 'Migrating...' : 'Migrate to Backend (Recommended)'}
-          </Text>
-        </TouchableOpacity>
-        
+
         <TouchableOpacity 
           style={[styles.actionButton, styles.sampleButton]} 
           onPress={createSampleData}
@@ -961,16 +831,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: theme.colors.primary,
   },
-  migrateButton: {
-    backgroundColor: theme.colors.success + '20',
-    borderWidth: 2,
-    borderColor: theme.colors.success,
-  },
-  testButton: {
-    backgroundColor: theme.colors.warning + '20',
-    borderWidth: 2,
-    borderColor: theme.colors.warning,
-  },
+
   instructionsContainer: {
     padding: 20,
   },
