@@ -118,6 +118,7 @@ export default function DebugScreen() {
         console.log(`📦 Found data in ${foundKey}, size: ${foundData.length} chars`);
         info.storageSize = `${Math.round(foundData.length / 1024)} KB`;
         info.rawData = foundData;
+        // Only show error if data is in wrong key (migration needed)
         info.lastError = foundKey !== 'homeslam_projects' ? `Data found in different key: ${foundKey}` : undefined;
         
         try {
@@ -132,6 +133,9 @@ export default function DebugScreen() {
               await AsyncStorage.setItem('homeslam_projects', foundData);
               await AsyncStorage.removeItem(foundKey);
               info.lastError = `Data migrated from ${foundKey} to correct location`;
+            } else {
+              // Clear any previous errors if data is healthy
+              info.lastError = undefined;
             }
           } else {
             info.hasCorruptedData = true;
@@ -143,7 +147,8 @@ export default function DebugScreen() {
         }
       } else {
         console.log('❌ No project data found in any storage key');
-        info.lastError = `No data found. Checked keys: ${possibleKeys.join(', ')}. All keys: ${allKeys.join(', ')}`;
+        // Don't show storage keys as error - this is normal for new users
+        info.lastError = undefined;
       }
 
       setDebugInfo(info);
@@ -503,9 +508,9 @@ export default function DebugScreen() {
           </View>
           
           {debugInfo.lastError && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorTitle}>Last Error:</Text>
-              <Text style={styles.errorText}>{debugInfo.lastError}</Text>
+            <View style={styles.infoContainer}>
+              <Text style={styles.infoTitle}>Migration Status:</Text>
+              <Text style={styles.infoText}>{debugInfo.lastError}</Text>
             </View>
           )}
         </View>
@@ -764,24 +769,15 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
     color: theme.colors.text,
   },
-  errorContainer: {
-    marginTop: 16,
-    padding: 16,
-    backgroundColor: theme.colors.error + '10',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: theme.colors.error + '30',
-  },
-  errorTitle: {
+  infoTitle: {
     fontSize: 16,
     fontWeight: '600' as const,
-    color: theme.colors.error,
+    color: theme.colors.text,
     marginBottom: 8,
   },
-  errorText: {
+  infoText: {
     fontSize: 14,
-    color: theme.colors.error,
-    fontFamily: 'monospace',
+    color: theme.colors.textLight,
   },
   actionsContainer: {
     padding: 20,
