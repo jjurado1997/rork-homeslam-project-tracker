@@ -354,15 +354,14 @@ export const [ProjectProvider, useProjects] = createContextHook(() => {
     // For period filtering, be more inclusive - show projects that are still relevant
     switch (selectedPeriod) {
       case 'daily':
-        // Show projects that start TODAY or are active (not completed)
+        // Show ONLY projects that start TODAY
         filtered = filtered.filter(p => {
           const projectDate = new Date(p.projectStartDate);
           projectDate.setHours(0, 0, 0, 0);
           const todayStart = new Date(startOfDay);
           todayStart.setHours(0, 0, 0, 0);
           const isToday = projectDate.getTime() === todayStart.getTime();
-          const isActiveProject = !p.isCompleted;
-          return isToday || isActiveProject;
+          return isToday;
         });
         break;
       case 'weekly':
